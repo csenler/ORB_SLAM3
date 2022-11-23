@@ -38,6 +38,8 @@
 #include "ImuTypes.h"
 #include "Settings.h"
 
+#include "../thirdparty/tracy/public/tracy/Tracy.hpp" // TODO: adjust CMakeList instead of direct path like this??
+
 namespace ORB_SLAM3
 {
 

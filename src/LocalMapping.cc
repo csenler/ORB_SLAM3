@@ -64,6 +64,8 @@ namespace ORB_SLAM3
 
         while (1)
         {
+            ZoneScopedN("LocalMapping::Run");
+
             // Tracking will see that Local Mapping is busy
             SetAcceptKeyFrames(false);
 

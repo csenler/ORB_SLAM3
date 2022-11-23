@@ -689,6 +689,7 @@ namespace ORB_SLAM3
 
     void System::SaveTrajectoryEuRoC(const string &filename)
     {
+        ZoneScopedN("SaveTrajectory");
 
         cout << endl
              << "Saving trajectory to " << filename << " ..." << endl;
@@ -1093,6 +1094,8 @@ namespace ORB_SLAM3
 
     void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
     {
+        ZoneScopedN("SaveKeyFrameTrajectory");
+
         cout << endl
              << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
