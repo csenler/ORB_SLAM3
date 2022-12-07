@@ -2058,17 +2058,31 @@ namespace ORB_SLAM3
                     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
+
+                    iRecentlyLostRelocCounter = 0;
                 }
                 // !!!cagri!!! =============================================
-                else if (mState == RECENTLY_LOST && !bOK && mCurrentFrame.mTimeStamp - mTimeStampLost > 2.0)
+                else if (mState == RECENTLY_LOST && !bOK && mCurrentFrame.mTimeStamp - mTimeStampLost > 2.0 && iRecentlyLostRelocCounter < 10)
                 {
                     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO)
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
+
+                    // limit with threshold ???
+                    if (bOK)
+                    {
+                        iRecentlyLostRelocCounter = 0;
+                    }
+                    else
+                        ++iRecentlyLostRelocCounter;
+
+                    Verbose::PrintMess("iRecentlyLostRelocCounter : " + std::to_string(iRecentlyLostRelocCounter), Verbose::VERBOSITY_NORMAL);
                 }
                 // ===============================================
                 else
                 {
+                    iRecentlyLostRelocCounter = 0;
+
                     if (!mbVO)
                     {
                         // In last frame we tracked enough MapPoints in the map
@@ -2338,6 +2352,8 @@ namespace ORB_SLAM3
                 mlbLost.push_back(mState == LOST);
             }
         }
+
+        // std::cout << "END OF TRACK()" << std::endl;
 
 #ifdef REGISTER_LOOP
         if (Stop())
@@ -2750,7 +2766,7 @@ namespace ORB_SLAM3
 
         if (nmatches < 15)
         {
-            cout << "TRACK_REF_KF: Less than 15 matches!!\n";
+            Verbose::PrintMess("TRACK_REF_KF: Less than 15 matches!!", Verbose::VERBOSITY_NORMAL);
             return false;
         }
 
@@ -3642,7 +3658,7 @@ namespace ORB_SLAM3
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
         vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap());
 
-        std::cout << "number of keyframe candidates (nKFs): " << vpCandidateKFs.size() << std::endl; // !!!cagri!!!
+        Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
 
         if (vpCandidateKFs.empty())
         {
@@ -3675,7 +3691,7 @@ namespace ORB_SLAM3
             else
             {
                 int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
-                std::cout << "nmatches : " << nmatches << std::endl;
+                Verbose::PrintMess("nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
                 if (nmatches < 15)
                 {
                     vbDiscarded[i] = true;
@@ -3691,7 +3707,7 @@ namespace ORB_SLAM3
             }
         }
 
-        std::cout << "Number of Candidates after PnPSolve (nCandidates): " << nCandidates << std::endl;
+        Verbose::PrintMess("Number of Candidates after PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
 
         // Alternatively perform some iterations of P4P RANSAC
         // Until we found a camera pose supported by enough inliers
@@ -3712,8 +3728,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw);
-                bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw);
+                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
+                // std::cout << "after iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << std::endl;
 
                 // If Ransac reachs max. iterations discard keyframe
                 if (bNoMore)
@@ -3745,6 +3762,7 @@ namespace ORB_SLAM3
                     }
 
                     int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+                    // std::cout << "nGood: " << nGood << std::endl;
 
                     if (nGood < 10)
                         continue;
@@ -3795,6 +3813,8 @@ namespace ORB_SLAM3
             }
         }
 
+        Verbose::PrintMess("relocalization -> after while loop", Verbose::VERBOSITY_NORMAL);
+
         if (!bMatch)
         {
             return false;
@@ -3802,7 +3822,7 @@ namespace ORB_SLAM3
         else
         {
             mnLastRelocFrameId = mCurrentFrame.mnId;
-            cout << "Relocalized!!" << endl;
+            Verbose::PrintMess("Relocalized!!", Verbose::VERBOSITY_NORMAL);
             return true;
         }
     }
