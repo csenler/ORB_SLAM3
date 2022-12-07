@@ -2062,7 +2062,7 @@ namespace ORB_SLAM3
                     iRecentlyLostRelocCounter = 0;
                 }
                 // !!!cagri!!! =============================================
-                else if (mState == RECENTLY_LOST && !bOK && mCurrentFrame.mTimeStamp - mTimeStampLost > 2.0 && iRecentlyLostRelocCounter < 10)
+                else if (mState == RECENTLY_LOST && !bOK && mCurrentFrame.mTimeStamp - mTimeStampLost > 2.0 && (iRelocEntryThreshold <= 0 || (iRelocEntryThreshold > 0 && iRecentlyLostRelocCounter < iRelocEntryThreshold)))
                 {
                     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO)
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
@@ -4170,5 +4170,11 @@ namespace ORB_SLAM3
         mbStopRequested = false;
     }
 #endif
+
+    void Tracking::setRelocalizationEntryThreshold(const int &val_)
+    {
+        this->iRelocEntryThreshold = val_;
+        Verbose::PrintMess("Relocalization Entry Threshold set to : " + std::to_string(this->iRelocEntryThreshold), Verbose::VERBOSITY_NORMAL);
+    }
 
 } // namespace ORB_SLAM

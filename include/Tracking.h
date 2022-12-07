@@ -190,6 +190,8 @@ namespace ORB_SLAM3
         vector<double> vdTrackTotal_ms;
 #endif
 
+        void setRelocalizationEntryThreshold(const int &val_);
+
     protected:
         // Main tracking function. It is independent of the input sensor.
         void Track();
@@ -364,6 +366,7 @@ namespace ORB_SLAM3
 #endif
 
         int iRecentlyLostRelocCounter{0};
+        int iRelocEntryThreshold{-1};
 
     public:
         cv::Mat mImRight;
