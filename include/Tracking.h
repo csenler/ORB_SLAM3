@@ -191,6 +191,7 @@ namespace ORB_SLAM3
 #endif
 
         void setRelocalizationEntryThreshold(const int &val_);
+        void setRelocPnPSolverIterationNum(const int &val_);
 
     protected:
         // Main tracking function. It is independent of the input sensor.
@@ -367,6 +368,7 @@ namespace ORB_SLAM3
 
         int iRecentlyLostRelocCounter{0};
         int iRelocEntryThreshold{-1};
+        int iRelocPnPSolverIteration{5}; // default 5
 
     public:
         cv::Mat mImRight;

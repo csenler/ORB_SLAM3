@@ -3728,8 +3728,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
+                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 // std::cout << "after iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << std::endl;
 
                 // If Ransac reachs max. iterations discard keyframe
@@ -4175,6 +4176,12 @@ namespace ORB_SLAM3
     {
         this->iRelocEntryThreshold = val_;
         Verbose::PrintMess("Relocalization Entry Threshold set to : " + std::to_string(this->iRelocEntryThreshold), Verbose::VERBOSITY_NORMAL);
+    }
+
+    void Tracking::setRelocPnPSolverIterationNum(const int &val_)
+    {
+        this->iRelocPnPSolverIteration = val_;
+        Verbose::PrintMess("Relocalization PnP Solver Iteration set to : " + std::to_string(this->iRelocPnPSolverIteration), Verbose::VERBOSITY_NORMAL);
     }
 
 } // namespace ORB_SLAM
