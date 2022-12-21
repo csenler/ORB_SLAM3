@@ -455,6 +455,9 @@ namespace ORB_SLAM3
         if (observations.empty())
             return;
 
+        // const auto refKFPoseInverse = pRefKF->GetPoseInverse();
+        // const auto refKFCameraCenter = refKFPoseInverse.translation();
+
         Eigen::Vector3f normal;
         normal.setZero();
         int n = 0;
@@ -482,6 +485,7 @@ namespace ORB_SLAM3
         }
 
         Eigen::Vector3f PC = Pos - pRefKF->GetCameraCenter();
+        // Eigen::Vector3f PC = Pos - refKFCameraCenter;
         const float dist = PC.norm();
 
         tuple<int, int> indexes = observations[pRefKF];

@@ -2023,6 +2023,7 @@ namespace ORB_SLAM3
                             if (mCurrentFrame.mTimeStamp - mTimeStampLost > 3.0f && !bOK)
                             {
                                 mState = LOST;
+                                Verbose::PrintMess("RECENTLY_LOST -> LOST, time diff: " + std::to_string(mCurrentFrame.mTimeStamp - mTimeStampLost) + " threshold: " + std::to_string(3.0f), Verbose::VERBOSITY_NORMAL);
                                 Verbose::PrintMess("Track Lost...", Verbose::VERBOSITY_NORMAL);
                                 bOK = false;
                             }
