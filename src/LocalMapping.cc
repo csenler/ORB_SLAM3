@@ -376,6 +376,11 @@ namespace ORB_SLAM3
             }
             else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
                 lit = mlpRecentAddedMapPoints.erase(lit);
+            else if (pMP->isWithoutRefKF())
+            {
+                pMP->SetBadFlag();
+                lit = mlpRecentAddedMapPoints.erase(lit);
+            }
             else
             {
                 lit++;

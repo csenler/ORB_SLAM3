@@ -634,6 +634,7 @@ namespace ORB_SLAM3
         if (!mpRefKF)
         {
             cout << "ERROR: MP without KF reference " << mBackupRefKFId << "; Num obs: " << nObs << endl;
+            bIsWithoutKFRef = true;
         }
         mpReplaced = static_cast<MapPoint *>(NULL);
         if (mBackupReplacedId >= 0)
