@@ -1482,6 +1482,10 @@ namespace ORB_SLAM3
         for (list<MapPoint *>::iterator lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
         {
             MapPoint *pMP = *lit;
+
+            if (pMP->isWithoutRefKF())
+                continue;
+
             g2o::VertexSBAPointXYZ *vPoint = static_cast<g2o::VertexSBAPointXYZ *>(optimizer.vertex(pMP->mnId + maxKFid + 1));
             pMP->SetWorldPos(vPoint->estimate().cast<float>());
             pMP->UpdateNormalAndDepth();
