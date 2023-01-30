@@ -91,3 +91,6 @@ my_settings.txt
 borrar/*
 
 */ExecMean.txt
+
+# TEMP
+include/Logger.h
