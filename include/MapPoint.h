@@ -161,6 +161,7 @@ namespace ORB_SLAM3
         bool isWithoutRefKF()
         {
             return bIsWithoutKFRef;
+            // return false;
         };
 
     public:
