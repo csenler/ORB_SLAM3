@@ -821,6 +821,9 @@ namespace ORB_SLAM3
             MapPoint *pMP = vpMapPointMatches[i];
             if (pMP)
             {
+                if (pMP->isWithoutRefKF())
+                    continue;
+
                 if (!pMP->isBad())
                 {
                     pMP->ComputeDistinctiveDescriptors();
