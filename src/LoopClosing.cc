@@ -89,7 +89,7 @@ namespace ORB_SLAM3
 
         while (1)
         {
-            ZoneScopedN("LoopClosing::Run");
+            TracyZoneScopedNamed("LoopClosing::Run");
 
             // NEW LOOP AND MERGE DETECTION ALGORITHM
             //----------------------------

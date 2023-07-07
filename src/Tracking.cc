@@ -1582,7 +1582,7 @@ namespace ORB_SLAM3
 
     Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename)
     {
-        ZoneScopedN("Tracking::GrabImageMonocular");
+        TracyZoneScopedNamed("Tracking::GrabImageMonocular");
 
         mImGray = im;
         if (mImGray.channels() == 3)
@@ -1814,7 +1814,7 @@ namespace ORB_SLAM3
 
     void Tracking::Track()
     {
-        ZoneScopedN("Tracking::Track");
+        TracyZoneScopedNamed("Tracking::Track");
 
         if (bStepByStep)
         {
@@ -2488,7 +2488,7 @@ namespace ORB_SLAM3
 
     void Tracking::MonocularInitialization()
     {
-        ZoneScopedN("Tracking::MonocularInitialization");
+        TracyZoneScopedNamed("Tracking::MonocularInitialization");
 
         if (!mbReadyToInitializate)
         {
@@ -2696,7 +2696,7 @@ namespace ORB_SLAM3
 
     void Tracking::CreateMapInAtlas()
     {
-        ZoneScopedN("Tracking::CrateMapInAtlas");
+        TracyZoneScopedNamed("Tracking::CrateMapInAtlas");
 
         mnLastInitFrameId = mCurrentFrame.mnId;
         mpAtlas->CreateNewMap();
@@ -2984,7 +2984,7 @@ namespace ORB_SLAM3
 
     bool Tracking::TrackLocalMap()
     {
-        ZoneScopedN("Tracking::TrackLocalMap");
+        TracyZoneScopedNamed("Tracking::TrackLocalMap");
 
         // We have an estimation of the camera pose and some map points tracked in the frame.
         // We retrieve the local map and try to find matches to points in the local map.
@@ -3099,7 +3099,7 @@ namespace ORB_SLAM3
 
     bool Tracking::NeedNewKeyFrame()
     {
-        ZoneScopedN("Tracking::NeedNewKeyFrame");
+        TracyZoneScopedNamed("Tracking::NeedNewKeyFrame");
 
         if ((mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) && !mpAtlas->GetCurrentMap()->isImuInitialized())
         {
@@ -3254,7 +3254,7 @@ namespace ORB_SLAM3
 
     void Tracking::CreateNewKeyFrame()
     {
-        ZoneScopedN("Tracking::CreateNewKeyFrame");
+        TracyZoneScopedNamed("Tracking::CreateNewKeyFrame");
 
         if (mpLocalMapper->IsInitializing() && !mpAtlas->isImuInitialized())
             return;
@@ -3649,7 +3649,7 @@ namespace ORB_SLAM3
 
     bool Tracking::Relocalization()
     {
-        ZoneScopedN("Tracking::Relocalization");
+        TracyZoneScopedNamed("Tracking::Relocalization");
 
         Verbose::PrintMess("Starting relocalization", Verbose::VERBOSITY_NORMAL);
         // Compute Bag of Words Vector
