@@ -91,6 +91,10 @@ namespace ORB_SLAM3
             }
         }
 
+        // get world frame rotation
+        cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+        this->Tc0w = this->getWorldFrameRotation(sensor, fSettings);
+
         initID = 0;
         lastID = 0;
         mbInitWith3KFs = false;
@@ -554,6 +558,46 @@ namespace ORB_SLAM3
     Tracking::~Tracking()
     {
         // f_track_stats.close();
+    }
+
+    Sophus::SE3f Tracking::getWorldFrameRotation(const int &sensor, const cv::FileStorage &fSettings)
+    {
+        // Obtain the angles which will be used to rotate the world frame
+        auto Tc0w = Sophus::SE3f();
+        if (sensor == System::MONOCULAR)
+        {
+            float dWorldRPY[3] = {};
+
+            string strAngleNames[3] = {"roll", "pitch", "yaw"};
+
+            std::cout << "Rotate world frame by (rad): ";
+            for (int i = 0; i < 3; i++)
+            {
+                cv::FileNode node = fSettings["WorldRPY." + strAngleNames[i]];
+                if (!node.empty() && node.isReal())
+                {
+                    dWorldRPY[i] = node.real();
+                }
+                else
+                {
+                    dWorldRPY[i] = 0;
+                }
+                std::cout << strAngleNames[i] << " " << dWorldRPY[i] << " ";
+            }
+            std::cout << std::endl;
+
+            Eigen::AngleAxisf AngleR(dWorldRPY[0], Eigen::Vector3f::UnitX());
+            Eigen::AngleAxisf AngleP(dWorldRPY[1], Eigen::Vector3f::UnitY());
+            Eigen::AngleAxisf AngleY(dWorldRPY[2], Eigen::Vector3f::UnitZ());
+            Eigen::Quaternionf qRPY = AngleR * AngleP * AngleY;
+            Eigen::Matrix3f RotRPY = qRPY.matrix();
+            Tc0w = Sophus::SE3f(RotRPY, Eigen::Vector3f::Zero());
+            std::cout << "Tc0w pos is: \n"
+                      << Tc0w.translation() << std::endl;
+            std::cout << "Tc0w rot is \n"
+                      << Tc0w.rotationMatrix() << std::endl;
+        }
+        return Tc0w;
     }
 
     void Tracking::newParameterLoader(Settings *settings)
@@ -2553,9 +2597,13 @@ namespace ORB_SLAM3
                     }
                 }
 
-                // Set Frame Poses
-                mInitialFrame.SetPose(Sophus::SE3f());
-                mCurrentFrame.SetPose(Tcw);
+                // // Set Frame Poses
+                // mInitialFrame.SetPose(Sophus::SE3f());
+                // mCurrentFrame.SetPose(Tcw);
+
+                // Set Frame Poses & rotate world frame
+                mInitialFrame.SetPose(Tc0w);
+                mCurrentFrame.SetPose(Tcw * Tc0w);
 
                 CreateInitialMapMonocular();
             }
@@ -2586,6 +2634,12 @@ namespace ORB_SLAM3
             // Create MapPoint.
             Eigen::Vector3f worldPos;
             worldPos << mvIniP3D[i].x, mvIniP3D[i].y, mvIniP3D[i].z;
+
+            // rotate by using values given in config
+            Sophus::SE3f Tc0mp(Eigen::Matrix3f::Identity(), worldPos);
+            Sophus::SE3f Twmp = Tc0w.inverse() * Tc0mp;
+            worldPos = Twmp.translation();
+
             MapPoint *pMP = new MapPoint(worldPos, pKFcur, mpAtlas->GetCurrentMap());
 
             pKFini->AddMapPoint(pMP, i);

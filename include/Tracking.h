@@ -357,6 +357,9 @@ namespace ORB_SLAM3
 
         void newParameterLoader(Settings *settings);
 
+        Sophus::SE3f getWorldFrameRotation(const int &sensor, const cv::FileStorage &fSettings);
+        Sophus::SE3f Tc0w; // world frame rotation matrix
+
 #ifdef REGISTER_LOOP
         bool Stop();
 
