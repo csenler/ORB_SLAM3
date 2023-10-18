@@ -43,26 +43,26 @@ namespace ORB_SLAM3
         template <class Archive>
         void serialize(Archive &ar, const unsigned int version)
         {
-            ar &mnId;
-            ar &mnInitKFid;
-            ar &mnMaxKFid;
-            ar &mnBigChangeIdx;
+            ar & mnId;
+            ar & mnInitKFid;
+            ar & mnMaxKFid;
+            ar & mnBigChangeIdx;
 
             // Save/load a set structure, the set structure is broken in libboost 1.58 for ubuntu 16.04, a vector is serializated
             // ar & mspKeyFrames;
             // ar & mspMapPoints;
-            ar &mvpBackupKeyFrames;
-            ar &mvpBackupMapPoints;
+            ar & mvpBackupKeyFrames;
+            ar & mvpBackupMapPoints;
 
-            ar &mvBackupKeyFrameOriginsId;
+            ar & mvBackupKeyFrameOriginsId;
 
-            ar &mnBackupKFinitialID;
-            ar &mnBackupKFlowerID;
+            ar & mnBackupKFinitialID;
+            ar & mnBackupKFlowerID;
 
-            ar &mbImuInitialized;
-            ar &mbIsInertial;
-            ar &mbIMU_BA1;
-            ar &mbIMU_BA2;
+            ar & mbImuInitialized;
+            ar & mbIsInertial;
+            ar & mbIMU_BA1;
+            ar & mbIMU_BA2;
         }
 
     public:
@@ -153,6 +153,19 @@ namespace ORB_SLAM3
         std::set<long unsigned int> msOptKFs;
         std::set<long unsigned int> msFixedKFs;
 
+        // related to primary marking
+        void markAsMerged()
+        {
+            unique_lock<mutex> lock(mMutexMergedMark);
+            bIsMerged = true;
+        }
+
+        bool isMergedMap()
+        {
+            unique_lock<mutex> lock(mMutexMergedMark);
+            return bIsMerged;
+        }
+
     protected:
         long unsigned int mnId;
 
@@ -196,6 +209,10 @@ namespace ORB_SLAM3
 
         // Mutex
         std::mutex mMutexMap;
+
+        // related to primary map marking
+        std::mutex mMutexMergedMark;
+        bool bIsMerged{false};
     };
 
 } // namespace ORB_SLAM3
