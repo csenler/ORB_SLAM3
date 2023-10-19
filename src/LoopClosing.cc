@@ -1760,6 +1760,13 @@ namespace ORB_SLAM3
         pCurrentMap->IncreaseChangeIndex();
         pMergeMap->IncreaseChangeIndex();
 
+        {
+            // mark current map as a merged map (should be useful on localization only mode with loaded single map)
+            const auto mergedMapId = mpAtlas->GetCurrentMap()->GetId();
+            Verbose::PrintMess("Marking map with ID " + std::to_string(mergedMapId) + " as merged", Verbose::VERBOSITY_NORMAL);
+            mpAtlas->GetCurrentMap()->markAsMerged();
+        }
+
         mpAtlas->RemoveBadMaps();
     }
 

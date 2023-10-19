@@ -3534,10 +3534,15 @@ namespace ORB_SLAM3
 
             for (vector<MapPoint *>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
             {
-
                 MapPoint *pMP = *itMP;
                 if (!pMP)
                     continue;
+                if (mbOnlyTracking && !pMP->GetMap()->isMergedMap())
+                {
+                    // localization only mode but MapPoint belongs to a different map than a previosly merged one, so mark it as Bad and continue
+                    pMP->SetBadFlag();
+                    continue;
+                }
                 if (pMP->mnTrackReferenceForFrame == mCurrentFrame.mnId)
                     continue;
                 if (!pMP->isBad())
@@ -3561,6 +3566,14 @@ namespace ORB_SLAM3
                 MapPoint *pMP = mCurrentFrame.mvpMapPoints[i];
                 if (pMP)
                 {
+                    // localization only mode but MapPoint belongs to a different map than a previosly merged one, so mark it as Bad
+                    if (mbOnlyTracking && !pMP->GetMap()->isMergedMap())
+                    {
+                        pMP->SetBadFlag();
+                        mCurrentFrame.mvpMapPoints[i] = NULL;
+                        continue;
+                    }
+
                     if (!pMP->isBad())
                     {
                         const map<KeyFrame *, tuple<int, int>> observations = pMP->GetObservations();
@@ -3584,6 +3597,15 @@ namespace ORB_SLAM3
                     MapPoint *pMP = mLastFrame.mvpMapPoints[i];
                     if (!pMP)
                         continue;
+
+                    // localization only mode but MapPoint belongs to a different map than a previosly merged one, so mark it as Bad and continue
+                    if (mbOnlyTracking && !pMP->GetMap()->isMergedMap())
+                    {
+                        pMP->SetBadFlag();
+                        mLastFrame.mvpMapPoints[i] = NULL;
+                        continue;
+                    }
+
                     if (!pMP->isBad())
                     {
                         const map<KeyFrame *, tuple<int, int>> observations = pMP->GetObservations();
@@ -3637,7 +3659,7 @@ namespace ORB_SLAM3
             for (vector<KeyFrame *>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
             {
                 KeyFrame *pNeighKF = *itNeighKF;
-                if (!pNeighKF->isBad())
+                if (pNeighKF && !pNeighKF->isBad())
                 {
                     if (pNeighKF->mnTrackReferenceForFrame != mCurrentFrame.mnId)
                     {
@@ -3652,7 +3674,7 @@ namespace ORB_SLAM3
             for (set<KeyFrame *>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
             {
                 KeyFrame *pChildKF = *sit;
-                if (!pChildKF->isBad())
+                if (pChildKF && !pChildKF->isBad())
                 {
                     if (pChildKF->mnTrackReferenceForFrame != mCurrentFrame.mnId)
                     {
