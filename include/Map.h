@@ -153,7 +153,7 @@ namespace ORB_SLAM3
         std::set<long unsigned int> msOptKFs;
         std::set<long unsigned int> msFixedKFs;
 
-        // related to primary marking
+        // related to merged marking
         void markAsMerged()
         {
             unique_lock<mutex> lock(mMutexMergedMark);
@@ -164,6 +164,19 @@ namespace ORB_SLAM3
         {
             unique_lock<mutex> lock(mMutexMergedMark);
             return bIsMerged;
+        }
+
+        // loaded map marking
+        void markAsLoaded()
+        {
+            unique_lock<mutex> lock(mMutexLoadedMark);
+            bIsLoadedMap = true;
+        }
+
+        bool isLoadedMap()
+        {
+            unique_lock<mutex> lock(mMutexLoadedMark);
+            return bIsLoadedMap;
         }
 
     protected:
@@ -210,9 +223,13 @@ namespace ORB_SLAM3
         // Mutex
         std::mutex mMutexMap;
 
-        // related to primary map marking
+        // related to merged map marking
         std::mutex mMutexMergedMark;
         bool bIsMerged{false};
+
+        // related to loaded map marking
+        std::mutex mMutexLoadedMark;
+        bool bIsLoadedMap{false};
     };
 
 } // namespace ORB_SLAM3
