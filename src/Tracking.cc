@@ -2873,6 +2873,10 @@ namespace ORB_SLAM3
     {
         // Update pose according to reference keyframe
         KeyFrame *pRef = mLastFrame.mpReferenceKF;
+
+        if (!pRef)
+            return;
+
         Sophus::SE3f Tlr = mlRelativeFramePoses.back();
         mLastFrame.SetPose(Tlr * pRef->GetPose());
 
