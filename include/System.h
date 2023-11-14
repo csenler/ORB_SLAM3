@@ -236,6 +236,11 @@ namespace ORB_SLAM3
 
         bool getMergeStatusFromLoopClosing();
 
+        bool checkShutDown();
+        void setActivateLocalizationMode(const bool &flag_);
+        void checkReset();
+        void updateStatesForTrack();
+
 #ifdef REGISTER_TIMES
         void InsertRectTime(double &time);
         void InsertResizeTime(double &time);

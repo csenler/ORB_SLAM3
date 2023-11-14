@@ -1754,4 +1754,43 @@ namespace ORB_SLAM3
         return false;
     }
 
+    bool System::checkShutDown()
+    {
+        unique_lock<mutex> lock(mMutexReset);
+        if (mbShutDown)
+            return true;
+        return false;
+    }
+
+    void System::setActivateLocalizationMode(const bool &flag_)
+    {
+        mbActivateLocalizationMode = flag_;
+    }
+
+    void System::checkReset()
+    {
+        // Check reset
+        unique_lock<mutex> lock(mMutexReset);
+        if (mbReset)
+        {
+            mpTracker->Reset();
+            mbReset = false;
+            mbResetActiveMap = false;
+        }
+        else if (mbResetActiveMap)
+        {
+            std::cout << "SYSTEM-> Reseting active map in monocular case" << std::endl;
+            mpTracker->ResetActiveMap();
+            mbResetActiveMap = false;
+        }
+    }
+
+    void System::updateStatesForTrack()
+    {
+        unique_lock<mutex> lock(mMutexState);
+        mTrackingState = mpTracker->mState;
+        mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+        mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    }
+
 } // namespace ORB_SLAM
