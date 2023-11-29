@@ -3534,6 +3534,10 @@ namespace ORB_SLAM3
         for (vector<KeyFrame *>::const_reverse_iterator itKF = mvpLocalKeyFrames.rbegin(), itEndKF = mvpLocalKeyFrames.rend(); itKF != itEndKF; ++itKF)
         {
             KeyFrame *pKF = *itKF;
+
+            if (!pKF)
+                continue;
+
             const vector<MapPoint *> vpMPs = pKF->GetMapPointMatches();
 
             for (vector<MapPoint *>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
