@@ -1747,7 +1747,7 @@ namespace ORB_SLAM3
         {
             MapPoint *pMP = vpMPs[i];
 
-            if (pMP->isBad())
+            if (!pMP || pMP->isBad())
                 continue;
 
             int nIDr;
@@ -1758,6 +1758,13 @@ namespace ORB_SLAM3
             else
             {
                 KeyFrame *pRefKF = pMP->GetReferenceKeyFrame();
+
+                if (!pRefKF)
+                {
+                    pMP->SetBadFlag();
+                    continue;
+                }
+
                 nIDr = pRefKF->mnId;
             }
 
