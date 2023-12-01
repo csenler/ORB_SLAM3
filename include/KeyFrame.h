@@ -321,7 +321,7 @@ public:
     const float mfGridElementHeightInv;
 
     // Variables used by the tracking
-    long unsigned int mnTrackReferenceForFrame;
+    long unsigned int mnTrackReferenceForFrame{0};
     long unsigned int mnFuseTargetForKF;
 
     // Variables used by the local mapping
