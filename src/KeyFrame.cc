@@ -620,7 +620,7 @@ namespace ORB_SLAM3
                 for (set<KeyFrame *>::iterator sit = mspChildrens.begin(), send = mspChildrens.end(); sit != send; sit++)
                 {
                     KeyFrame *pKF = *sit;
-                    if (pKF->isBad())
+                    if (!pKF || pKF->isBad())
                         continue;
 
                     // Check if a parent candidate is connected to the keyframe
@@ -659,6 +659,9 @@ namespace ORB_SLAM3
             {
                 for (set<KeyFrame *>::iterator sit = mspChildrens.begin(); sit != mspChildrens.end(); sit++)
                 {
+                    if (!(*sit)) // TODO: this should be removed from mspChildrens???
+                        continue;
+
                     (*sit)->ChangeParent(mpParent);
                 }
             }

@@ -1734,6 +1734,10 @@ namespace ORB_SLAM3
             const int nIDi = pKFi->mnId;
 
             g2o::VertexSim3Expmap *VSim3 = static_cast<g2o::VertexSim3Expmap *>(optimizer.vertex(nIDi));
+
+            if (!VSim3)
+                continue;
+
             g2o::Sim3 CorrectedSiw = VSim3->estimate();
             vCorrectedSwc[nIDi] = CorrectedSiw.inverse();
             double s = CorrectedSiw.scale();
