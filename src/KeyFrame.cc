@@ -662,7 +662,10 @@ namespace ORB_SLAM3
                     if (!(*sit)) // TODO: this should be removed from mspChildrens???
                         continue;
 
-                    (*sit)->ChangeParent(mpParent);
+                    if (mpParent) // TODO: what will happen in this case, will they be left dangling???
+                    {
+                        (*sit)->ChangeParent(mpParent);
+                    }
                 }
             }
 

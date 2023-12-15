@@ -961,6 +961,9 @@ namespace ORB_SLAM3
     {
         // cout << "Loop detected!" << endl;
 
+        // set flag so that slam_node will stop requesting new frames till this method finishes
+        bMergeAfterLoopCloseActive.store(true);
+
         // Send a stop signal to Local Mapping
         // Avoid new keyframes are inserted while correcting the loop
         mpLocalMapper->RequestStop();
@@ -1078,6 +1081,8 @@ namespace ORB_SLAM3
                     if (pMPi->isBad())
                         continue;
                     if (pMPi->mnCorrectedByKF == mpCurrentKF->mnId)
+                        continue;
+                    if (pMPi->isWithoutRefKF())
                         continue;
 
                     // Project with non-corrected pose and project back with corrected pose
@@ -1198,6 +1203,9 @@ namespace ORB_SLAM3
 
         // Loop closed. Release Local Mapping.
         mpLocalMapper->Release();
+
+        // reset bMergeAfterLoopCloseActive flag for slam_node
+        bMergeAfterLoopCloseActive.store(false);
 
         mLastLoopKFid = mpCurrentKF->mnId; // TODO old varible, it is not use in the new algorithm
     }

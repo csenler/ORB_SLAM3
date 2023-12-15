@@ -95,6 +95,11 @@ namespace ORB_SLAM3
             return bMergeStatus;
         }
 
+        bool isMergeAfterLoopInProgress() const
+        {
+            return bMergeAfterLoopCloseActive.load();
+        }
+
 #ifdef REGISTER_TIMES
 
         vector<double> vdDataQuery_ms;
@@ -246,6 +251,9 @@ namespace ORB_SLAM3
 
         std::atomic<bool> bMergeStatus{false};
         std::mutex mMutexMergeStatus;
+
+        // to return if CorrectLoop is active or not (loop close and merge process)
+        std::atomic<bool> bMergeAfterLoopCloseActive{false};
 
 #ifdef REGISTER_LOOP
         string mstrFolderLoop;
