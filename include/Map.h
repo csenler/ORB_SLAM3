@@ -28,6 +28,7 @@
 
 #include <boost/serialization/base_object.hpp>
 
+#include <boost/serialization/version.hpp>
 namespace ORB_SLAM3
 {
 
@@ -63,6 +64,12 @@ namespace ORB_SLAM3
             ar & mbIsInertial;
             ar & mbIMU_BA1;
             ar & mbIMU_BA2;
+
+            if (version >= 1)
+            {
+                // uuid
+                ar & strMapUUID;
+            }
         }
 
     public:
@@ -179,6 +186,18 @@ namespace ORB_SLAM3
             return bIsLoadedMap;
         }
 
+        std::string getUUID()
+        {
+            unique_lock<mutex> lock(mMutexUUID);
+            return strMapUUID;
+        }
+
+        void setUUID(const std::string &uuid_)
+        {
+            unique_lock<mutex> lock(mMutexUUID);
+            strMapUUID = uuid_;
+        }
+
     protected:
         long unsigned int mnId;
 
@@ -230,8 +249,15 @@ namespace ORB_SLAM3
         // related to loaded map marking
         std::mutex mMutexLoadedMark;
         bool bIsLoadedMap{false};
+
+        // map uuid
+        std::string strMapUUID;
+        std::mutex mMutexUUID;
     };
 
 } // namespace ORB_SLAM3
+
+// Define a version number for the class
+BOOST_CLASS_VERSION(ORB_SLAM3::Map, 1)
 
 #endif // MAP_H
