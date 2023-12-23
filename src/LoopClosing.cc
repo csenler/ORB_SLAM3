@@ -2262,7 +2262,10 @@ namespace ORB_SLAM3
         const bool bImuInit = pActiveMap->isImuInitialized();
 
         if (!bImuInit)
-            Optimizer::GlobalBundleAdjustemnt(pActiveMap, 10, &mbStopGBA, nLoopKF, false);
+        {
+            // Optimizer::GlobalBundleAdjustemnt(pActiveMap, 10, &mbStopGBA, nLoopKF, false);
+            Optimizer::GlobalBundleAdjustemnt(pActiveMap, iNumIterGBA.load(), &mbStopGBA, nLoopKF, false);
+        }
         else
             Optimizer::FullInertialBA(pActiveMap, 7, false, nLoopKF, &mbStopGBA);
 

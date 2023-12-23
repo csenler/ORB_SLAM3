@@ -100,6 +100,16 @@ namespace ORB_SLAM3
             return bMergeAfterLoopCloseActive.load();
         }
 
+        void setGBAIterationCount(int val_)
+        {
+            iNumIterGBA.store(val_);
+        }
+
+        int getGBAIterCount() const
+        {
+            return iNumIterGBA.load();
+        }
+
 #ifdef REGISTER_TIMES
 
         vector<double> vdDataQuery_ms;
@@ -254,6 +264,9 @@ namespace ORB_SLAM3
 
         // to return if CorrectLoop is active or not (loop close and merge process)
         std::atomic<bool> bMergeAfterLoopCloseActive{false};
+
+        // global bundle adjustment iteration argument
+        std::atomic<int> iNumIterGBA{10}; // default was 10.
 
 #ifdef REGISTER_LOOP
         string mstrFolderLoop;
