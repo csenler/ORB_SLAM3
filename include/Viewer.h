@@ -69,6 +69,11 @@ namespace ORB_SLAM3
         void setLocalizationModeFromAutoCheck(const bool &state);
         bool getLocalizationModeFromAutoCheck();
 
+        bool isLocalizationModeButtonPressed() const
+        {
+            return bLocalizationModeButtonPressed.load();
+        }
+
     private:
         bool ParseViewerParamFile(cv::FileStorage &fSettings);
 
@@ -100,6 +105,8 @@ namespace ORB_SLAM3
 
         bool localizationModeFromConfig{false};
         bool bLocalizationModeFromAutoCheck{false};
+
+        std::atomic<bool> bLocalizationModeButtonPressed{false};
     };
 
 }

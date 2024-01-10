@@ -293,13 +293,17 @@ namespace ORB_SLAM3
 
             if (menuLocalizationMode && !bLocalizationMode)
             {
+                std::cout << "Viewer -> activating localization mode via button !!!" << std::endl;
                 mpSystem->ActivateLocalizationMode();
                 bLocalizationMode = true;
+                bLocalizationModeButtonPressed.store(true);
             }
             else if (!menuLocalizationMode && bLocalizationMode)
             {
+                std::cout << "Viewer -> DE-activating localization mode via button !!!" << std::endl;
                 mpSystem->DeactivateLocalizationMode();
                 bLocalizationMode = false;
+                bLocalizationModeButtonPressed.store(false);
             }
 
             if (menuStepByStep && !bStepByStep)
@@ -478,5 +482,4 @@ namespace ORB_SLAM3
     {
         return bLocalizationModeFromAutoCheck;
     }
-
 }
