@@ -193,6 +193,18 @@ namespace ORB_SLAM3
         void setRelocalizationEntryThreshold(const int &val_);
         void setRelocPnPSolverIterationNum(const int &val_);
 
+        void setORBmatcherMultiplicationFactor(const float factor_)
+        {
+            std::lock_guard<std::mutex> lock(mMutexORBmatcherFactor);
+            iORBmatcherMultiplicationFactor = factor_;
+        }
+
+        float getORBmatcherMultiplicationFactor()
+        {
+            std::lock_guard<std::mutex> lock(mMutexORBmatcherFactor);
+            return iORBmatcherMultiplicationFactor;
+        }
+
     protected:
         // Main tracking function. It is independent of the input sensor.
         void Track();
@@ -372,6 +384,10 @@ namespace ORB_SLAM3
         int iRecentlyLostRelocCounter{0};
         int iRelocEntryThreshold{-1};
         int iRelocPnPSolverIteration{5}; // default 5
+
+        // multiplcation factor for ORBmatchers in TrackMotionModel, TrackReferenceKeyframe and Relocalization methods
+        std::mutex mMutexORBmatcherFactor;
+        float iORBmatcherMultiplicationFactor{1.0}; // default is 1 so that it does not change anything
 
     public:
         cv::Mat mImRight;

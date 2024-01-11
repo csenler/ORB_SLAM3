@@ -2814,7 +2814,7 @@ namespace ORB_SLAM3
 
         // We perform first an ORB matching with the reference keyframe
         // If enough matches are found we setup a PnP solver
-        ORBmatcher matcher(0.7, true);
+        ORBmatcher matcher(0.7 * iORBmatcherMultiplicationFactor, true);
         vector<MapPoint *> vpMapPointMatches;
 
         int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
@@ -2949,7 +2949,7 @@ namespace ORB_SLAM3
 
     bool Tracking::TrackWithMotionModel()
     {
-        ORBmatcher matcher(0.9, true);
+        ORBmatcher matcher(0.9 * iORBmatcherMultiplicationFactor, true);
 
         // Update last frame pose according to its reference keyframe
         // Create "visual odometry" points if in Localization Mode
@@ -3756,7 +3756,7 @@ namespace ORB_SLAM3
 
         // We perform first an ORB matching with each candidate
         // If enough matches are found we setup a PnP solver
-        ORBmatcher matcher(0.75, true);
+        ORBmatcher matcher(0.75 * iORBmatcherMultiplicationFactor, true);
 
         vector<MLPnPsolver *> vpMLPnPsolvers;
         vpMLPnPsolvers.resize(nKFs);
@@ -3798,7 +3798,7 @@ namespace ORB_SLAM3
         // Alternatively perform some iterations of P4P RANSAC
         // Until we found a camera pose supported by enough inliers
         bool bMatch = false;
-        ORBmatcher matcher2(0.9, true);
+        ORBmatcher matcher2(0.9 * iORBmatcherMultiplicationFactor, true);
 
         while (nCandidates > 0 && !bMatch)
         {
