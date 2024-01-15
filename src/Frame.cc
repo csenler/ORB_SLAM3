@@ -742,9 +742,9 @@ namespace ORB_SLAM3
         {
             vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
             mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
-            // std::cout << "vCurrentDesc size: " << vCurrentDesc.size() << std::endl;
-            // std::cout << "mBowVec size: " << mBowVec.size() << std::endl;
-            // std::cout << "mFeatVec size: " << mFeatVec.size() << std::endl;
+            // std::cout << "ComputeBoW -> vCurrentDesc size: " << vCurrentDesc.size() << std::endl;
+            // std::cout << "ComputeBoW -> mBowVec size: " << mBowVec.size() << std::endl;
+            // std::cout << "ComputeBoW -> mFeatVec size: " << mFeatVec.size() << std::endl;
         }
     }
 

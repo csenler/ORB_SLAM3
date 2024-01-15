@@ -2104,6 +2104,13 @@ namespace ORB_SLAM3
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
 
+                    // if (!bOK)
+                    // {
+                    //     bOK = Relocalization2();
+                    //     if (bOK)
+                    //         Verbose::PrintMess("Track -> state=LOST => Relocalization2 successful!", Verbose::VERBOSITY_NORMAL);
+                    // }
+
                     iRecentlyLostRelocCounter = 0;
                 }
                 // !!!cagri!!! =============================================
@@ -2119,7 +2126,18 @@ namespace ORB_SLAM3
                         iRecentlyLostRelocCounter = 0;
                     }
                     else
+                    {
+                        // bOK = Relocalization2();
+                        // if (!bOK)
+                        //     ++iRecentlyLostRelocCounter;
+                        // else
+                        // {
+                        //     Verbose::PrintMess("Track -> state=RECENTLY_LOST => Relocalization2 successful!", Verbose::VERBOSITY_NORMAL);
+                        //     iRecentlyLostRelocCounter = 0;
+                        // }
+
                         ++iRecentlyLostRelocCounter;
+                    }
 
                     Verbose::PrintMess("iRecentlyLostRelocCounter : " + std::to_string(iRecentlyLostRelocCounter), Verbose::VERBOSITY_NORMAL);
                 }
@@ -3744,6 +3762,16 @@ namespace ORB_SLAM3
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
         vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap());
 
+        // NOTE: below did not work, no candidates were being found
+        // Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
+        // if (vpCandidateKFs.empty())
+        // {
+        //     const float fAccFactor = 0.5;            // default is 0.75
+        //     const float fMinCommonWordsFactor = 0.6; // default is 0.8
+        //     Verbose::PrintMess("Relocalization -> running DetectRelocalizationCandidates again with decrease accuracy -> fAccFactor: " + std::to_string(fAccFactor) + " fMinCommonWordsFactor: " + std::to_string(fMinCommonWordsFactor), Verbose::VERBOSITY_NORMAL);
+        //     vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap(), fAccFactor, fMinCommonWordsFactor);
+        // }
+
         Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
 
         if (vpCandidateKFs.empty())
@@ -3778,7 +3806,7 @@ namespace ORB_SLAM3
             {
                 int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
                 Verbose::PrintMess("nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
-                if (nmatches < 15)
+                if (nmatches < 15) // default 15
                 {
                     vbDiscarded[i] = true;
                     continue;
@@ -3817,7 +3845,7 @@ namespace ORB_SLAM3
                 // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
                 bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
-                // std::cout << "after iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << std::endl;
+                std::cout << "after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
 
                 // If Ransac reachs max. iterations discard keyframe
                 if (bNoMore)
@@ -3892,6 +3920,190 @@ namespace ORB_SLAM3
 
                     // If the pose is supported by enough inliers stop ransacs and continue
                     if (nGood >= 50)
+                    {
+                        bMatch = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        Verbose::PrintMess("relocalization -> after while loop", Verbose::VERBOSITY_NORMAL);
+
+        if (!bMatch)
+        {
+            return false;
+        }
+        else
+        {
+            mnLastRelocFrameId = mCurrentFrame.mnId;
+            Verbose::PrintMess("Relocalized!!", Verbose::VERBOSITY_NORMAL);
+            return true;
+        }
+    }
+
+    bool Tracking::Relocalization2()
+    {
+        TracyZoneScopedNamed("Tracking::Relocalization2");
+
+        Verbose::PrintMess("Starting relocalization2", Verbose::VERBOSITY_NORMAL);
+        // Compute Bag of Words Vector
+        mCurrentFrame.ComputeBoW();
+
+        // Relocalization is performed when tracking is lost
+        // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+        const float fAccFactor = 0.5;            // default is 0.75
+        const float fMinCommonWordsFactor = 0.6; // default is 0.8
+        Verbose::PrintMess("Relocalization -> running DetectRelocalizationCandidates again with decrease accuracy -> fAccFactor: " + std::to_string(fAccFactor) + " fMinCommonWordsFactor: " + std::to_string(fMinCommonWordsFactor), Verbose::VERBOSITY_NORMAL);
+        vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap(), fAccFactor, fMinCommonWordsFactor);
+        Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
+
+        if (vpCandidateKFs.empty())
+        {
+            Verbose::PrintMess("There are not candidates", Verbose::VERBOSITY_NORMAL);
+            return false;
+        }
+
+        const int nKFs = vpCandidateKFs.size();
+
+        // We perform first an ORB matching with each candidate
+        // If enough matches are found we setup a PnP solver
+        ORBmatcher matcher(0.75 * iORBmatcherMultiplicationFactor, true);
+
+        vector<MLPnPsolver *> vpMLPnPsolvers;
+        vpMLPnPsolvers.resize(nKFs);
+
+        vector<vector<MapPoint *>> vvpMapPointMatches;
+        vvpMapPointMatches.resize(nKFs);
+
+        vector<bool> vbDiscarded;
+        vbDiscarded.resize(nKFs);
+
+        int nCandidates = 0;
+
+        for (int i = 0; i < nKFs; i++)
+        {
+            KeyFrame *pKF = vpCandidateKFs[i];
+            if (pKF->isBad())
+                vbDiscarded[i] = true;
+            else
+            {
+                int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
+                Verbose::PrintMess("nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
+                if (nmatches < 10)
+                {
+                    vbDiscarded[i] = true;
+                    continue;
+                }
+                else
+                {
+                    MLPnPsolver *pSolver = new MLPnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
+                    pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 5.991); // This solver needs at least 6 points
+                    vpMLPnPsolvers[i] = pSolver;
+                    nCandidates++;
+                }
+            }
+        }
+
+        Verbose::PrintMess("Number of Candidates after PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
+
+        // Alternatively perform some iterations of P4P RANSAC
+        // Until we found a camera pose supported by enough inliers
+        bool bMatch = false;
+        ORBmatcher matcher2(0.9 * iORBmatcherMultiplicationFactor, true);
+
+        while (nCandidates > 0 && !bMatch)
+        {
+            for (int i = 0; i < nKFs; i++)
+            {
+                if (vbDiscarded[i])
+                    continue;
+
+                // Perform 5 Ransac Iterations
+                vector<bool> vbInliers;
+                int nInliers;
+                bool bNoMore;
+
+                MLPnPsolver *pSolver = vpMLPnPsolvers[i];
+                Eigen::Matrix4f eigTcw;
+                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
+                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
+                // std::cout << "after iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << std::endl;
+
+                // If Ransac reachs max. iterations discard keyframe
+                if (bNoMore)
+                {
+                    vbDiscarded[i] = true;
+                    nCandidates--;
+                }
+
+                // If a Camera Pose is computed, optimize
+                if (bTcw)
+                {
+                    Sophus::SE3f Tcw(eigTcw);
+                    mCurrentFrame.SetPose(Tcw);
+                    // Tcw.copyTo(mCurrentFrame.mTcw);
+
+                    set<MapPoint *> sFound;
+
+                    const int np = vbInliers.size();
+
+                    for (int j = 0; j < np; j++)
+                    {
+                        if (vbInliers[j])
+                        {
+                            mCurrentFrame.mvpMapPoints[j] = vvpMapPointMatches[i][j];
+                            sFound.insert(vvpMapPointMatches[i][j]);
+                        }
+                        else
+                            mCurrentFrame.mvpMapPoints[j] = NULL;
+                    }
+
+                    int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+                    // std::cout << "nGood: " << nGood << std::endl;
+
+                    if (nGood < 8)
+                        continue;
+
+                    for (int io = 0; io < mCurrentFrame.N; io++)
+                        if (mCurrentFrame.mvbOutlier[io])
+                            mCurrentFrame.mvpMapPoints[io] = static_cast<MapPoint *>(NULL);
+
+                    // If few inliers, search by projection in a coarse window and optimize again
+                    if (nGood < 30)
+                    {
+                        int nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 10, 100);
+
+                        if (nadditional + nGood >= 30)
+                        {
+                            nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+
+                            // If many inliers but still not enough, search by projection again in a narrower window
+                            // the camera has been already optimized with many points
+                            if (nGood > 15 && nGood < 30)
+                            {
+                                sFound.clear();
+                                for (int ip = 0; ip < mCurrentFrame.N; ip++)
+                                    if (mCurrentFrame.mvpMapPoints[ip])
+                                        sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
+                                nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 3, 64);
+
+                                // Final optimization
+                                if (nGood + nadditional >= 30)
+                                {
+                                    nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+
+                                    for (int io = 0; io < mCurrentFrame.N; io++)
+                                        if (mCurrentFrame.mvbOutlier[io])
+                                            mCurrentFrame.mvpMapPoints[io] = NULL;
+                                }
+                            }
+                        }
+                    }
+
+                    // If the pose is supported by enough inliers stop ransacs and continue
+                    if (nGood >= 30)
                     {
                         bMatch = true;
                         break;
