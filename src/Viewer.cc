@@ -308,7 +308,7 @@ namespace ORB_SLAM3
 
             if (menuStepByStep && !bStepByStep)
             {
-                // cout << "Viewer: step by step" << endl;
+                std::cout << "Viewer: step by step" << std::endl;
                 mpTracker->SetStepByStep(true);
                 bStepByStep = true;
             }

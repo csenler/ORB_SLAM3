@@ -1745,6 +1745,8 @@ namespace ORB_SLAM3
                     else
                         vIndices2 = CurrentFrame.GetFeaturesInArea(uv(0), uv(1), radius, nLastOctave - 1, nLastOctave + 1);
 
+                    // std::cout << "ORBmatcher::SearchByProjection: vIndices2 feature vec size = " << vIndices2.size() << std::endl;
+
                     if (vIndices2.empty())
                         continue;
 
@@ -1874,6 +1876,8 @@ namespace ORB_SLAM3
             }
         }
 
+        std::cout << "ORBmatcher::SearchByProjection: nmatches size BEFORE orientation check = " << nmatches << std::endl;
+
         // Apply rotation consistency
         if (mbCheckOrientation)
         {
@@ -1895,6 +1899,8 @@ namespace ORB_SLAM3
                 }
             }
         }
+
+        std::cout << "ORBmatcher::SearchByProjection: nmatches size AFTER orientation check = " << nmatches << std::endl;
 
         return nmatches;
     }

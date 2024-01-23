@@ -205,6 +205,109 @@ namespace ORB_SLAM3
             return iORBmatcherMultiplicationFactor;
         }
 
+        // statistics for measuring Track success
+        struct TrackStatistics
+        {
+            TrackStatistics()
+            {
+                eCurrentState = SYSTEM_NOT_READY;
+                ePreviousState = SYSTEM_NOT_READY;
+            }
+
+            void Reset()
+            {
+                eCurrentState = SYSTEM_NOT_READY;
+                ePreviousState = SYSTEM_NOT_READY;
+                iNumOfResultantMatches = 0;
+                iNumOfWords = 0;
+                iNumOfTrackWithMotionModelCalls = 0;
+                iNumOfTrackReferenceKeyFrameCalls = 0;
+                iNumOfRelocalizationCalls = 0;
+                iFrameId = -1;
+                iNumOfExtractedORBKeyPoints = 0;
+                // iTrackViaMotionMatchResult = 0;
+                // iTrackViaReferenceKeyFrameMatchResult = 0;
+                bVisualOdomFlag = false;
+
+                vRelocStats.clear();
+            }
+
+            eTrackingState eCurrentState, ePreviousState; // will be filled at TrackMonocular after GrabImageMonocular returns
+            int iNumOfExtractedORBKeyPoints{0};
+            int iNumOfMatchedMapPoints{0};
+            int iNumOfVisualOdomPoints{0}; // temporal points that are not matches with map points in map, in localization only mode
+            // int iTrackViaMotionMatchResult{0};
+            // int iTrackViaReferenceKeyFrameMatchResult{0};
+            int iNumOfResultantMatches{0};
+            int iNumOfWords{0};
+            int iNumOfFeaturesOfVocNodes{0};
+            int iNumOfTrackWithMotionModelCalls{0};
+            int iNumOfTrackReferenceKeyFrameCalls{0};
+            int iNumOfRelocalizationCalls{0};
+            int iFrameId{-1};
+            bool bVisualOdomFlag{false}; // this is set in TrackWithMotionModel() if there are not enough matches with map points
+            bool bVelocityFlag{false};
+
+            struct RelocStats
+            {
+                RelocStats()
+                {
+                    iNumOfKFCandidatesBeforeSearchByBow = 0;
+                    iNumOfKFCandidatesAfterSearchByBow = 0;
+                    vNumOfBoWMatches.clear();
+                    vNumOfInliers.clear();
+                    vGoodMatchesAfterPoseOptimization.clear();
+                    vAdditionalMatchesAfterPoseOptimization.clear();
+                    vNumOfResultantGoodInliers.clear();
+                    bRelocSuccess = false;
+                }
+
+                void Reset()
+                {
+                    iNumOfKFCandidatesBeforeSearchByBow = 0;
+                    iNumOfKFCandidatesAfterSearchByBow = 0;
+                    vNumOfBoWMatches.clear();
+                    vNumOfInliers.clear();
+                    vGoodMatchesAfterPoseOptimization.clear();
+                    vAdditionalMatchesAfterPoseOptimization.clear();
+                    vNumOfResultantGoodInliers.clear();
+                    bRelocSuccess = false;
+                }
+
+                void reserveVectors(const int &size_)
+                {
+                    // reserve should only allocate in case bigger capacity requested
+                    vNumOfBoWMatches.reserve(size_);
+                    vNumOfInliers.reserve(size_);
+                    vGoodMatchesAfterPoseOptimization.reserve(size_);
+                    vAdditionalMatchesAfterPoseOptimization.reserve(size_);
+                    vNumOfResultantGoodInliers.reserve(size_);
+                }
+
+                void initializeVectors(const int &size_, const int &value_)
+                {
+                    // initialize vectors with given value
+                    vNumOfBoWMatches.assign(size_, value_);
+                    vNumOfInliers.assign(size_, value_);
+                    vGoodMatchesAfterPoseOptimization.assign(size_, value_);
+                    vAdditionalMatchesAfterPoseOptimization.assign(size_, value_);
+                    vNumOfResultantGoodInliers.assign(size_, value_);
+                }
+
+                int iNumOfKFCandidatesBeforeSearchByBow{0};               // KF candidates before PnP solve
+                int iNumOfKFCandidatesAfterSearchByBow{0};                // KF candidates after PnP solve
+                std::vector<int> vNumOfBoWMatches;                        // after searchByBoW, for each candidate KF
+                std::vector<int> vNumOfInliers;                           // after RANSAC iterations, for each candidate KF that have enough words
+                std::vector<int> vGoodMatchesAfterPoseOptimization;       // after pose optimization, for  each candidate KF
+                std::vector<int> vAdditionalMatchesAfterPoseOptimization; // after pose optimization, calculated if not enough inliers, for  each candidate KF
+                std::vector<int> vNumOfResultantGoodInliers;              // at the end of relocation, for each candidate KF
+                bool bRelocSuccess{false};
+            };
+
+            std::vector<RelocStats> vRelocStats;
+
+        } sTrackStats;
+
     protected:
         // Main tracking function. It is independent of the input sensor.
         void Track();

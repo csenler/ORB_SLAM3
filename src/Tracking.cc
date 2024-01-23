@@ -1671,8 +1671,12 @@ namespace ORB_SLAM3
         vdORBExtract_ms.push_back(mCurrentFrame.mTimeORB_Ext);
 #endif
 
+        sTrackStats.iNumOfExtractedORBKeyPoints = mCurrentFrame.mvKeys.size();
+
         lastID = mCurrentFrame.mnId;
         Track();
+
+        sTrackStats.bVelocityFlag = mbVelocity;
 
         return mCurrentFrame.GetPose();
     }
@@ -1990,7 +1994,6 @@ namespace ORB_SLAM3
 #ifdef REGISTER_TIMES
             std::chrono::steady_clock::time_point time_StartPosePred = std::chrono::steady_clock::now();
 #endif
-
             // Initial camera pose estimation using motion model or relocalization (if tracking is lost)
             if (!mbOnlyTracking)
             {
@@ -2102,6 +2105,8 @@ namespace ORB_SLAM3
                 {
                     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
+
+                    Verbose::PrintMess("Calling Relocalization due to LOST state", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
 
                     // if (!bOK)
@@ -2118,6 +2123,8 @@ namespace ORB_SLAM3
                 {
                     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO)
                         Verbose::PrintMess("IMU. State LOST", Verbose::VERBOSITY_NORMAL);
+
+                    Verbose::PrintMess("Calling Relocalization due to RECENTLY_LOST state", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
 
                     // limit with threshold ???
@@ -2161,7 +2168,8 @@ namespace ORB_SLAM3
                     else
                     {
                         // In last frame we tracked mainly "visual odometry" points.
-
+                        Verbose::PrintMess("In last frame we tracked mainly 'visual odometry' points, we will compute two camera poses (motion model and relocalization)...", Verbose::VERBOSITY_NORMAL);
+                        Verbose::PrintMess("-- mbVelocity? :" + std::to_string(mbVelocity), Verbose::VERBOSITY_NORMAL);
                         // We compute two camera poses, one from motion model and one doing relocalization.
                         // If relocalization is sucessfull we choose that solution, otherwise we retain
                         // the "visual odometry" solution.
@@ -2173,12 +2181,17 @@ namespace ORB_SLAM3
                         Sophus::SE3f TcwMM;
                         if (mbVelocity)
                         {
+                            Verbose::PrintMess("-- velocity flag is true, calling TrackWithMotionModel...", Verbose::VERBOSITY_NORMAL);
                             bOKMM = TrackWithMotionModel();
                             vpMPsMM = mCurrentFrame.mvpMapPoints;
                             vbOutMM = mCurrentFrame.mvbOutlier;
                             TcwMM = mCurrentFrame.GetPose();
                         }
+                        Verbose::PrintMess("-- Calling Relocalization because last frame used 'visual odometry'", Verbose::VERBOSITY_NORMAL);
                         bOKReloc = Relocalization();
+
+                        Verbose::PrintMess("-- TrackWithMotionModel result (bOKMM): " + std::to_string(bOKMM), Verbose::VERBOSITY_NORMAL);
+                        Verbose::PrintMess("-- Relocalization result (bOKReloc): " + std::to_string(bOKReloc), Verbose::VERBOSITY_NORMAL);
 
                         if (bOKMM && !bOKReloc)
                         {
@@ -2236,7 +2249,13 @@ namespace ORB_SLAM3
                 // a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
                 // the camera we will use the local map again.
                 if (bOK && !mbVO)
-                    bOK = TrackLocalMap();
+                {
+                    bOK = TrackLocalMap(); // TODO: in localization-only mode, after reloc success, sometimes enter here, should it not try TrackMotionModel or TrackReferenceFrame
+                    if (!bOK)
+                    {
+                        std::cout << "Localization-Only mode TrackLocalMap failed!" << std::endl;
+                    }
+                }
             }
 
             if (bOK)
@@ -2827,6 +2846,9 @@ namespace ORB_SLAM3
 
     bool Tracking::TrackReferenceKeyFrame()
     {
+        // increase stat counter
+        sTrackStats.iNumOfTrackReferenceKeyFrameCalls++;
+
         // Compute Bag of Words vector
         mCurrentFrame.ComputeBoW();
 
@@ -2836,6 +2858,10 @@ namespace ORB_SLAM3
         vector<MapPoint *> vpMapPointMatches;
 
         int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
+
+        std::cout << "Tracking::TrackReferenceKeyFrame: nmatches after SearchByBoW = " << nmatches << std::endl;
+
+        sTrackStats.iNumOfResultantMatches = nmatches;
 
         if (nmatches < 15)
         {
@@ -2880,6 +2906,8 @@ namespace ORB_SLAM3
                     nmatchesMap++;
             }
         }
+
+        sTrackStats.iNumOfResultantMatches = nmatches;
 
         if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)
             return true;
@@ -2967,6 +2995,9 @@ namespace ORB_SLAM3
 
     bool Tracking::TrackWithMotionModel()
     {
+        // increase stat counter
+        sTrackStats.iNumOfTrackWithMotionModelCalls++;
+
         ORBmatcher matcher(0.9 * iORBmatcherMultiplicationFactor, true);
 
         // Update last frame pose according to its reference keyframe
@@ -3005,6 +3036,8 @@ namespace ORB_SLAM3
             nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th, mSensor == System::MONOCULAR || mSensor == System::IMU_MONOCULAR);
             Verbose::PrintMess("Matches with wider search: " + to_string(nmatches), Verbose::VERBOSITY_NORMAL);
         }
+
+        sTrackStats.iNumOfResultantMatches = nmatches;
 
         if (nmatches < 20)
         {
@@ -3046,9 +3079,14 @@ namespace ORB_SLAM3
             }
         }
 
+        sTrackStats.iNumOfResultantMatches = nmatches;
+
         if (mbOnlyTracking)
         {
             mbVO = nmatchesMap < 10;
+            Verbose::PrintMess("TrackWithMotionModel -> nmatchesMap (map point matches): " + std::to_string(nmatchesMap) + " nmatches (visual odom matches): " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
+            Verbose::PrintMess("TrackWithMotionModel -> mbVO flag : " + std::to_string(static_cast<int>(mbVO)), Verbose::VERBOSITY_NORMAL);
+            sTrackStats.bVisualOdomFlag = mbVO;
             return nmatches > 20;
         }
 
@@ -3137,6 +3175,8 @@ namespace ORB_SLAM3
                     mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
             }
         }
+
+        Verbose::PrintMess("TrackLocalMap -> mnMatchesInliers: " + std::to_string(mnMatchesInliers), Verbose::VERBOSITY_NORMAL);
 
         // Decide if the tracking was succesful
         // More restrictive if there was a relocalization recently
@@ -3754,6 +3794,10 @@ namespace ORB_SLAM3
     {
         TracyZoneScopedNamed("Tracking::Relocalization");
 
+        // increase counter
+        sTrackStats.iNumOfRelocalizationCalls++;
+        sTrackStats.vRelocStats.push_back(TrackStatistics::RelocStats());
+
         Verbose::PrintMess("Starting relocalization", Verbose::VERBOSITY_NORMAL);
         // Compute Bag of Words Vector
         mCurrentFrame.ComputeBoW();
@@ -3773,6 +3817,12 @@ namespace ORB_SLAM3
         // }
 
         Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
+
+        sTrackStats.vRelocStats.back().iNumOfKFCandidatesBeforeSearchByBow = vpCandidateKFs.size();
+        // reserve spaces for other vectors in sTrackStats
+        sTrackStats.vRelocStats.back().reserveVectors(vpCandidateKFs.size());
+        // initialize with zero
+        sTrackStats.vRelocStats.back().initializeVectors(vpCandidateKFs.size(), 0);
 
         if (vpCandidateKFs.empty())
         {
@@ -3806,6 +3856,9 @@ namespace ORB_SLAM3
             {
                 int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
                 Verbose::PrintMess("nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
+
+                sTrackStats.vRelocStats.back().vNumOfBoWMatches[i] = nmatches;
+
                 if (nmatches < 15) // default 15
                 {
                     vbDiscarded[i] = true;
@@ -3822,6 +3875,7 @@ namespace ORB_SLAM3
         }
 
         Verbose::PrintMess("Number of Candidates after PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
+        sTrackStats.vRelocStats.back().iNumOfKFCandidatesAfterSearchByBow = nCandidates;
 
         // Alternatively perform some iterations of P4P RANSAC
         // Until we found a camera pose supported by enough inliers
@@ -3846,6 +3900,8 @@ namespace ORB_SLAM3
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
                 bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 std::cout << "after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
+
+                sTrackStats.vRelocStats.back().vNumOfInliers[i] = nInliers;
 
                 // If Ransac reachs max. iterations discard keyframe
                 if (bNoMore)
@@ -3879,6 +3935,8 @@ namespace ORB_SLAM3
                     int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
                     // std::cout << "nGood: " << nGood << std::endl;
 
+                    sTrackStats.vRelocStats.back().vGoodMatchesAfterPoseOptimization[i] = nGood;
+
                     if (nGood < 10)
                         continue;
 
@@ -3890,6 +3948,8 @@ namespace ORB_SLAM3
                     if (nGood < 50)
                     {
                         int nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 10, 100);
+
+                        sTrackStats.vRelocStats.back().vAdditionalMatchesAfterPoseOptimization[i] = nadditional;
 
                         if (nadditional + nGood >= 50)
                         {
@@ -3918,6 +3978,8 @@ namespace ORB_SLAM3
                         }
                     }
 
+                    sTrackStats.vRelocStats.back().vNumOfResultantGoodInliers[i] = nGood;
+
                     // If the pose is supported by enough inliers stop ransacs and continue
                     if (nGood >= 50)
                     {
@@ -3932,12 +3994,14 @@ namespace ORB_SLAM3
 
         if (!bMatch)
         {
+            sTrackStats.vRelocStats.back().bRelocSuccess = false;
             return false;
         }
         else
         {
             mnLastRelocFrameId = mCurrentFrame.mnId;
             Verbose::PrintMess("Relocalized!!", Verbose::VERBOSITY_NORMAL);
+            sTrackStats.vRelocStats.back().bRelocSuccess = true;
             return true;
         }
     }
@@ -4005,7 +4069,7 @@ namespace ORB_SLAM3
             }
         }
 
-        Verbose::PrintMess("Number of Candidates after PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
+        Verbose::PrintMess("Number of Candidates BEFORE PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
 
         // Alternatively perform some iterations of P4P RANSAC
         // Until we found a camera pose supported by enough inliers
