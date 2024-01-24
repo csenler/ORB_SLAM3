@@ -247,6 +247,8 @@ namespace ORB_SLAM3
             int iFrameId{-1};
             bool bVisualOdomFlag{false}; // this is set in TrackWithMotionModel() if there are not enough matches with map points
             bool bVelocityFlag{false};
+            int iNumOfKeyFrames{0}; // this may be useful when in mapping(slam) mode
+            int iNumOfMapPoints{0}; // this may be useful when in mapping(slam) mode
 
             struct RelocStats
             {
