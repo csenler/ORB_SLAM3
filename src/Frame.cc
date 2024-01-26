@@ -741,7 +741,7 @@ namespace ORB_SLAM3
         if (mBowVec.empty())
         {
             vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-            mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
+            mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 5); // default = 4 levels up (6 levels in vocabulary)
             std::cout << "ComputeBoW -> vCurrentDesc size: " << vCurrentDesc.size() << std::endl;
             std::cout << "ComputeBoW -> mBowVec size: " << mBowVec.size() << std::endl;
             // std::cout << "ComputerBow -> mBowVec : " << mBowVec << std::endl;

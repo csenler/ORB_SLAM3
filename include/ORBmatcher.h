@@ -117,6 +117,8 @@ namespace ORB_SLAM3
 
         float mfNNratio;
         bool mbCheckOrientation;
+
+        int calculateHistBinIndexFromRotation(float rot);
     };
 
 } // namespace ORB_SLAM
