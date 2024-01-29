@@ -1754,6 +1754,13 @@ namespace ORB_SLAM3
         return false;
     }
 
+    void System::resetMergeStatusAtLoopClosing()
+    {
+        unique_lock<std::mutex> lock(mMutexMergeStatus);
+        if (mpLoopCloser)
+            return mpLoopCloser->setMergeStatus(false);
+    }
+
     bool System::checkShutDown()
     {
         unique_lock<mutex> lock(mMutexReset);

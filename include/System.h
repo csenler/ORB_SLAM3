@@ -235,6 +235,7 @@ namespace ORB_SLAM3
         std::pair<bool, bool> getLocalizationModeStates();
 
         bool getMergeStatusFromLoopClosing();
+        void resetMergeStatusAtLoopClosing();
 
         bool checkShutDown();
         void setActivateLocalizationMode(const bool &flag_);

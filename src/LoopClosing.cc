@@ -91,6 +91,22 @@ namespace ORB_SLAM3
         {
             TracyZoneScopedNamed("LoopClosing::Run");
 
+            // sleep for a while if LoopClose flag is not set (LC is disabled)
+            if (!mbActiveLC.load())
+            {
+                ResetIfRequested();
+
+                if (CheckFinish())
+                {
+                    break;
+                }
+
+                usleep(5000);
+            }
+
+            // indicate that loop closing is running
+            bLoopCloseCycleFinished.store(false);
+
             // NEW LOOP AND MERGE DETECTION ALGORITHM
             //----------------------------
 
@@ -299,6 +315,9 @@ namespace ORB_SLAM3
                 break;
             }
 
+            // loop closing can be disabled
+            bLoopCloseCycleFinished.store(true);
+
             usleep(5000);
         }
 
@@ -308,7 +327,7 @@ namespace ORB_SLAM3
     void LoopClosing::InsertKeyFrame(KeyFrame *pKF)
     {
         unique_lock<mutex> lock(mMutexLoopQueue);
-        if (pKF->mnId != 0)
+        if (mbActiveLC.load() && pKF->mnId != 0) // if LoopClosing is deactivated, the KF is not inserted  into the queue
             mlpLoopKeyFrameQueue.push_back(pKF);
     }
 
@@ -321,7 +340,7 @@ namespace ORB_SLAM3
     bool LoopClosing::NewDetectCommonRegions()
     {
         // To deactivate placerecognition. No loopclosing nor merging will be performed
-        if (!mbActiveLC)
+        if (!mbActiveLC.load())
             return false;
 
         {

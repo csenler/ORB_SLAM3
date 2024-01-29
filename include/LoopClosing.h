@@ -110,6 +110,41 @@ namespace ORB_SLAM3
             return iNumIterGBA.load();
         }
 
+        void stopLoopClosing()
+        {
+            mbActiveLC.store(false);
+        }
+
+        void startLoopClosing()
+        {
+            mbActiveLC.store(true);
+        }
+
+        bool isStopped()
+        {
+            return !mbActiveLC.load();
+        }
+
+        bool isCycleFinished()
+        {
+            return bLoopCloseCycleFinished.load();
+        }
+
+        void enableGlobalBundleAdjustment()
+        {
+            bDisableGlobalBundleAdjustment.store(false);
+        }
+
+        void disableGlobalBundleAdjustment()
+        {
+            bDisableGlobalBundleAdjustment.store(true);
+        }
+
+        bool isGlobalBundleAdjustmentDisabled()
+        {
+            return bDisableGlobalBundleAdjustment.load();
+        }
+
 #ifdef REGISTER_TIMES
 
         vector<double> vdDataQuery_ms;
@@ -257,7 +292,8 @@ namespace ORB_SLAM3
         int mnCorrectionGBA;
 
         // To (de)activate LC
-        bool mbActiveLC = true;
+        // bool mbActiveLC = true;
+        std::atomic<bool> mbActiveLC{true};
 
         std::atomic<bool> bMergeStatus{false};
         std::mutex mMutexMergeStatus;
@@ -267,6 +303,12 @@ namespace ORB_SLAM3
 
         // global bundle adjustment iteration argument
         std::atomic<int> iNumIterGBA{10}; // default was 10.
+
+        // to control loop close in progress or not
+        std::atomic<bool> bLoopCloseCycleFinished{false};
+
+        // to disable Global Bundle Adjustment
+        std::atomic<bool> bDisableGlobalBundleAdjustment{false};
 
 #ifdef REGISTER_LOOP
         string mstrFolderLoop;

@@ -1483,7 +1483,7 @@ namespace ORB_SLAM3
         {
             MapPoint *pMP = *lit;
 
-            if (pMP->isWithoutRefKF())
+            if (pMP->isWithoutRefKF()) // TODO: should set bad flag here?
                 continue;
 
             g2o::VertexSBAPointXYZ *vPoint = static_cast<g2o::VertexSBAPointXYZ *>(optimizer.vertex(pMP->mnId + maxKFid + 1));
