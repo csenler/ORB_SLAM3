@@ -4546,4 +4546,14 @@ namespace ORB_SLAM3
         Verbose::PrintMess("Relocalization PnP Solver Iteration set to : " + std::to_string(this->iRelocPnPSolverIteration), Verbose::VERBOSITY_NORMAL);
     }
 
+    cv::Mat Tracking::getCurrentViewerFrame() const
+    {
+        if (mpFrameDrawer)
+        {
+            return mpFrameDrawer->DrawFrame(mImageScale);
+        }
+        else
+            return cv::Mat();
+    }
+
 } // namespace ORB_SLAM

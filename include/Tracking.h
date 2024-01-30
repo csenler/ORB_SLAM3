@@ -310,6 +310,8 @@ namespace ORB_SLAM3
 
         } sTrackStats;
 
+        cv::Mat getCurrentViewerFrame() const;
+
     protected:
         // Main tracking function. It is independent of the input sensor.
         void Track();
