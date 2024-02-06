@@ -41,6 +41,8 @@
 #include <mutex>
 #include <unordered_set>
 
+#include <stack_buffer.h>
+#include "AuxiliaryFrameDatabase.h"
 namespace ORB_SLAM3
 {
 
@@ -332,6 +334,7 @@ namespace ORB_SLAM3
 
         bool Relocalization();
         bool Relocalization2();
+        bool RelocalizationViaExternalBuffer();
 
         void UpdateLocalMap();
         void UpdateLocalPoints();
@@ -496,6 +499,60 @@ namespace ORB_SLAM3
         // multiplcation factor for ORBmatchers in TrackMotionModel, TrackReferenceKeyframe and Relocalization methods
         std::mutex mMutexORBmatcherFactor;
         float iORBmatcherMultiplicationFactor{1.0}; // default is 1 so that it does not change anything
+
+        struct AuxiliaryFrameStorage
+        {
+            AuxiliaryFrameStorage()
+            {
+                ptrORBVocabulary = nullptr;
+            }
+
+            AuxiliaryFrameStorage(ORBVocabulary *ptrVoc)
+            {
+                ptrORBVocabulary = ptrVoc;
+                auxFrameDB.SetORBVocabulary(ptrORBVocabulary);
+            }
+
+            void addFrameToStorage(Frame &frame)
+            {
+                // create AuxiliaryFrame object and add to storage
+                AuxiliaryFrame auxFrame(frame);
+                auxFrameDB.add(&auxFrame);
+            }
+
+            void addFrameToStorage(Frame *pFrame)
+            {
+                // create AuxiliaryFrame object and add to storage
+                AuxiliaryFrame auxFrame(*pFrame);
+                auxFrameDB.add(&auxFrame);
+            }
+
+            void clearStorage()
+            {
+                auxFrameDB.clear();
+            }
+
+            void setVocabulary(ORBVocabulary *ptrVoc)
+            {
+                ptrORBVocabulary = ptrVoc;
+                auxFrameDB.SetORBVocabulary(ptrORBVocabulary);
+            }
+
+            AuxiliaryFrameDatabase *GetAuxFrameDB()
+            {
+                return &auxFrameDB;
+            }
+
+        private:
+            // vector to hold latest N tracked frames for relocalization
+            // StackBuffer<Frame> vLastNTrackedFrames;
+
+            // BoW
+            ORBVocabulary *ptrORBVocabulary;
+            AuxiliaryFrameDatabase auxFrameDB;
+        };
+
+        AuxiliaryFrameStorage *ptrAuxiliaryFrameStorage;
 
     public:
         cv::Mat mImRight;

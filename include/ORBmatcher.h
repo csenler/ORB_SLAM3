@@ -50,6 +50,9 @@ namespace ORB_SLAM3
         // Used in relocalisation (Tracking)
         int SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const std::set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist);
 
+        // search by using auxiliary frame database instead of keyframe database
+        int SearchByProjection(Frame &CurrentFrame, Frame *pKF, const set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist);
+
         // Project MapPoints using a Similarity Transformation and search matches.
         // Used in loop detection (Loop Closing)
         int SearchByProjection(KeyFrame *pKF, Sophus::Sim3<float> &Scw, const std::vector<MapPoint *> &vpPoints, std::vector<MapPoint *> &vpMatched, int th, float ratioHamming = 1.0);
@@ -63,6 +66,9 @@ namespace ORB_SLAM3
         // Used in Relocalisation and Loop Detection
         int SearchByBoW(KeyFrame *pKF, Frame &F, std::vector<MapPoint *> &vpMapPointMatches);
         int SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12);
+
+        // search by using auxiliary frame database instead of keyframe database
+        int SearchByBoW(Frame *pF, Frame &F, vector<MapPoint *> &vpMapPointMatches);
 
         // Matching for the Map Initialization (only used in the monocular case)
         int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize = 10);
