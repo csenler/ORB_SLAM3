@@ -41,7 +41,7 @@
 #include <mutex>
 #include <unordered_set>
 
-#include <stack_buffer.h>
+#include "stack_buffer.h"
 #include "AuxiliaryFrameDatabase.h"
 namespace ORB_SLAM3
 {

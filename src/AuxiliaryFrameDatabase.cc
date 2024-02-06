@@ -2,10 +2,6 @@
 
 namespace ORB_SLAM3
 {
-    AuxiliaryFrameDatabase::AuxiliaryFrameDatabase()
-    {
-    }
-
     AuxiliaryFrameDatabase::AuxiliaryFrameDatabase(const ORBVocabulary &voc)
     {
         pVoc = &voc;

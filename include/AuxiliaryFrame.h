@@ -27,7 +27,7 @@ namespace ORB_SLAM3
         }
 
         // Variables used by the keyframe database during relocalization
-        long unsigned int mnRelocQuery{-1};
+        long unsigned int mnRelocQuery{0};
         int mnRelocWords{0};
         float mRelocScore{0};
 

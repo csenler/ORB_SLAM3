@@ -4015,6 +4015,7 @@ namespace ORB_SLAM3
         }
     }
 
+    // this should be triggered in addition to normal Relocalization method and only with localization-only mode, NOT TESTED YET
     bool Tracking::RelocalizationViaExternalBuffer() // TODO
     {
 
