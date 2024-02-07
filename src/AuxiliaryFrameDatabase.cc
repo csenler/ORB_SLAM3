@@ -4,58 +4,74 @@ namespace ORB_SLAM3
 {
     AuxiliaryFrameDatabase::AuxiliaryFrameDatabase(const ORBVocabulary &voc)
     {
-        pVoc = &voc;
+        pVoc = std::make_shared<ORBVocabulary>(voc);
         vInvertedFile.resize(voc.size());
+
+        AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * voc.size();
     }
 
     void AuxiliaryFrameDatabase::SetORBVocabulary(ORBVocabulary *pORBVoc)
     {
-        pVoc = pORBVoc;
+        pVoc = std::make_shared<ORBVocabulary>(*pORBVoc);
         vInvertedFile.clear();
         vInvertedFile.resize(pVoc->size());
+
+        AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * pVoc->size();
     }
 
-    void AuxiliaryFrameDatabase::add(AuxiliaryFrame *pAuxFrame)
+    int AuxiliaryFrameDatabase::getTotalFrameSize() const
     {
-        const auto pFrame = pAuxFrame->GetFrame();
+        int nSize = 0;
+        for (const auto &l : vInvertedFile)
+        {
+            nSize += l.size();
+        }
+        return nSize;
+    }
+
+    void AuxiliaryFrameDatabase::add(const AuxiliaryFrame &refFrame)
+    {
+        const auto pFrame = refFrame.GetFrame();
+
+        if (!pFrame)
+        {
+            std::cerr << "AuxiliaryFrameDatabase::add -> Frame is nullptr !!!" << std::endl;
+            return;
+        }
 
         if (pFrame->mBowVec.empty())
         {
-            pVoc->transform(pFrame->mDescriptors, pFrame->mBowVec, pFrame->mFeatVec, 4);
+            vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(pFrame->mDescriptors);
+            pVoc->transform(vCurrentDesc, pFrame->mBowVec, pFrame->mFeatVec, 4);
         }
         for (auto vit = pFrame->mBowVec.begin(), vend = pFrame->mBowVec.end(); vit != vend; vit++)
         {
-            vInvertedFile[vit->first].push_back(pAuxFrame);
+            vInvertedFile[vit->first].push_back(std::make_shared<AuxiliaryFrame>(refFrame));
+
+            // check for truncation
+            if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
+            {
+                std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
+                vInvertedFile[vit->first].pop_front();
+            }
         }
 
         // truncate if needed
-        truncateDatabase();
+        // truncateDatabase();
     }
 
-    void AuxiliaryFrameDatabase::erase(AuxiliaryFrame *pAuxFrame)
-    {
-        const auto pFrame = pAuxFrame->GetFrame();
-
-        for (auto vit = pFrame->mBowVec.begin(), vend = pFrame->mBowVec.end(); vit != vend; vit++)
-        {
-            list<AuxiliaryFrame *> &l = vInvertedFile[vit->first];
-            for (list<AuxiliaryFrame *>::iterator lit = l.begin(), lend = l.end(); lit != lend; lit++)
-            {
-                if (*lit == pAuxFrame)
-                {
-                    l.erase(lit);
-                    break;
-                }
-            }
-        }
-    }
-
-    void AuxiliaryFrameDatabase::truncateDatabase() // TODO: this needs to be tested for memory leaks
+    void AuxiliaryFrameDatabase::truncateDatabase()
     {
         // if database size is bigger than a threshold value, then truncate the database by removing oldest elements
-        if (vInvertedFile.size() > AUX_DB_CAPACITY)
+        if (getTotalFrameSize() > AUX_DB_CAPACITY_TOTAL)
         {
-            vInvertedFile.resize(AUX_DB_CAPACITY);
+            for (auto &l : vInvertedFile)
+            {
+                while (l.size() > AUX_DB_CAPACITY_PER_WORD)
+                {
+                    l.pop_front();
+                }
+            }
         }
     }
 
@@ -65,20 +81,30 @@ namespace ORB_SLAM3
         vInvertedFile.resize(pVoc->size());
     }
 
+    DBoW2::BowVector AuxiliaryFrameDatabase::computeAuxiliaryBoW(Frame *pF)
+    {
+        DBoW2::BowVector vBow;
+        vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(pF->mDescriptors);
+        pVoc->transform(vCurrentDesc, vBow, pF->mFeatVec, 4);
+        return vBow;
+    }
+
     std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectCandidates(Frame *pF)
     {
+        // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
+        auto vBow = computeAuxiliaryBoW(pF);
+
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
-        for (auto vit = pF->mBowVec.begin(), vend = pF->mBowVec.end(); vit != vend; vit++)
+        for (auto vit = vBow.begin(), vend = vBow.end(); vit != vend; vit++)
         {
-            list<AuxiliaryFrame *> &l = vInvertedFile[vit->first];
-            for (const auto auxFrame : l)
+            for (auto &auxFrame : vInvertedFile[vit->first])
             {
                 if (auxFrame->mnRelocQuery != pF->mnId)
                 {
                     auxFrame->mnRelocWords = 0;
                     auxFrame->mnRelocQuery = pF->mnId;
-                    lFramesSharingWords.push_back(auxFrame);
+                    lFramesSharingWords.push_back(auxFrame.get());
                 }
                 auxFrame->mnRelocWords++;
             }
@@ -112,7 +138,7 @@ namespace ORB_SLAM3
             if (auxFrame->mnRelocWords > minCommonWords)
             {
                 nscores++;
-                float si = pVoc->score(pF->mBowVec, auxFrame->GetFrame()->mBowVec);
+                float si = pVoc->score(vBow, auxFrame->GetFrame()->mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -126,6 +152,7 @@ namespace ORB_SLAM3
 
         // return those that are within the 80% of the best score
         std::vector<AuxiliaryFrame *> vAuxFrames;
+        vAuxFrames.reserve(lScoreAndMatch.size());
         for (const auto &scoreAndMatch : lScoreAndMatch)
         {
             if (scoreAndMatch.first > 0.8f * bestAccScore)
@@ -141,6 +168,10 @@ namespace ORB_SLAM3
     {
         // NOTE: this is same as the DetectRelocalizationCandidates in KeyFrameDatabase, except we will use reference KeyFrames of Frames in the auxiliary database
         // in addition, we are assuming KFs are in same map since we should be in localization-only mode when this method is used
+        // also, extra BoW calculation just in case
+
+        // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
+        auto vBow = computeAuxiliaryBoW(pF);
 
         list<KeyFrame *> lKFsSharingWords;
 
@@ -148,11 +179,9 @@ namespace ORB_SLAM3
         {
             unique_lock<mutex> lock(mMutex);
 
-            for (DBoW2::BowVector::const_iterator vit = pF->mBowVec.begin(), vend = pF->mBowVec.end(); vit != vend; vit++)
+            for (DBoW2::BowVector::const_iterator vit = vBow.begin(), vend = vBow.end(); vit != vend; vit++)
             {
-                list<AuxiliaryFrame *> &lAuxFrames = vInvertedFile[vit->first];
-
-                for (const auto auxFrame : lAuxFrames)
+                for (auto &auxFrame : vInvertedFile[vit->first])
                 {
                     // get reference KF of the auxiliary frame
                     KeyFrame *pKFi = auxFrame->GetFrame()->mpReferenceKF;
@@ -195,7 +224,7 @@ namespace ORB_SLAM3
             if (pKFi->mnRelocWords > minCommonWords)
             {
                 nscores++;
-                float si = pVoc->score(pF->mBowVec, pKFi->mBowVec);
+                float si = pVoc->score(vBow, pKFi->mBowVec);
                 pKFi->mRelocScore = si;
                 lScoreAndMatch.push_back(make_pair(si, pKFi));
             }

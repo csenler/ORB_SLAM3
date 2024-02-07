@@ -16,14 +16,17 @@ namespace ORB_SLAM3
     {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        AuxiliaryFrame() : pFrame(nullptr) {}
+
         AuxiliaryFrame(const Frame &frame)
         {
-            pFrame = new Frame(frame);
+            pFrame = std::make_shared<Frame>(frame);
         }
 
         Frame *GetFrame() const
         {
-            return pFrame;
+            return pFrame.get();
         }
 
         // Variables used by the keyframe database during relocalization
@@ -32,8 +35,8 @@ namespace ORB_SLAM3
         float mRelocScore{0};
 
     protected:
-        // copied frame
-        Frame *pFrame;
+        // original frame, shared_ptr so that we can get ownership from reference
+        std::shared_ptr<Frame> pFrame{nullptr};
     };
 
 } // namespace ORB_SLAM

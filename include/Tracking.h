@@ -513,19 +513,19 @@ namespace ORB_SLAM3
                 auxFrameDB.SetORBVocabulary(ptrORBVocabulary);
             }
 
-            void addFrameToStorage(Frame &frame)
+            void addFrameToStorage(const Frame &frame)
             {
                 // create AuxiliaryFrame object and add to storage
                 AuxiliaryFrame auxFrame(frame);
-                auxFrameDB.add(&auxFrame);
+                auxFrameDB.add(auxFrame);
             }
 
-            void addFrameToStorage(Frame *pFrame)
-            {
-                // create AuxiliaryFrame object and add to storage
-                AuxiliaryFrame auxFrame(*pFrame);
-                auxFrameDB.add(&auxFrame);
-            }
+            // void addFrameToStorage(Frame *pFrame)
+            // {
+            //     // create AuxiliaryFrame object and add to storage
+            //     AuxiliaryFrame auxFrame(*pFrame);
+            //     auxFrameDB.add(&auxFrame);
+            // }
 
             void clearStorage()
             {
@@ -552,7 +552,7 @@ namespace ORB_SLAM3
             AuxiliaryFrameDatabase auxFrameDB;
         };
 
-        AuxiliaryFrameStorage *ptrAuxiliaryFrameStorage;
+        AuxiliaryFrameStorage *ptrAuxiliaryFrameStorage{nullptr};
 
     public:
         cv::Mat mImRight;

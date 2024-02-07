@@ -1584,12 +1584,6 @@ namespace ORB_SLAM3
         Track();
         // cout << "Tracking end" << endl;
 
-        // pass frame to external storage if it was Tracked
-        if (mState == eTrackingState::OK)
-        {
-            ptrAuxiliaryFrameStorage->addFrameToStorage(mCurrentFrame);
-        }
-
         return mCurrentFrame.GetPose();
     }
 
@@ -1686,6 +1680,14 @@ namespace ORB_SLAM3
         Track();
 
         sTrackStats.bVelocityFlag = mbVelocity;
+
+        // pass frame to external storage if it was Tracked
+        if (mState == eTrackingState::OK)
+        {
+            Verbose::PrintMess("GrabImageMonoular -> aux db frame size (before add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
+            ptrAuxiliaryFrameStorage->addFrameToStorage(mCurrentFrame);
+            Verbose::PrintMess("GrabImageMonoular -> aux db frame size (after add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
+        }
 
         return mCurrentFrame.GetPose();
     }
@@ -2118,12 +2120,13 @@ namespace ORB_SLAM3
                     Verbose::PrintMess("Calling Relocalization due to LOST state", Verbose::VERBOSITY_NORMAL);
                     bOK = Relocalization();
 
-                    // if (!bOK)
-                    // {
-                    //     bOK = Relocalization2();
-                    //     if (bOK)
-                    //         Verbose::PrintMess("Track -> state=LOST => Relocalization2 successful!", Verbose::VERBOSITY_NORMAL);
-                    // }
+                    if (!bOK)
+                    {
+                        Verbose::PrintMess("Track -> normal Relocalization failed, calling RelocalizationViaExternalBuffer...", Verbose::VERBOSITY_NORMAL);
+                        bOK = RelocalizationViaExternalBuffer();
+                        if (bOK)
+                            Verbose::PrintMess("Track -> state=LOST => RelocalizationViaExternalBuffer successful!", Verbose::VERBOSITY_NORMAL);
+                    }
 
                     iRecentlyLostRelocCounter = 0;
                 }
@@ -2143,16 +2146,17 @@ namespace ORB_SLAM3
                     }
                     else
                     {
-                        // bOK = Relocalization2();
-                        // if (!bOK)
-                        //     ++iRecentlyLostRelocCounter;
-                        // else
-                        // {
-                        //     Verbose::PrintMess("Track -> state=RECENTLY_LOST => Relocalization2 successful!", Verbose::VERBOSITY_NORMAL);
-                        //     iRecentlyLostRelocCounter = 0;
-                        // }
+                        Verbose::PrintMess("Track -> normal Relocalization failed, calling RelocalizationViaExternalBuffer...", Verbose::VERBOSITY_NORMAL);
+                        bOK = RelocalizationViaExternalBuffer();
+                        if (!bOK)
+                            ++iRecentlyLostRelocCounter;
+                        else
+                        {
+                            Verbose::PrintMess("Track -> state=RECENTLY_LOST => RelocalizationViaExternalBuffer successful!", Verbose::VERBOSITY_NORMAL);
+                            iRecentlyLostRelocCounter = 0;
+                        }
 
-                        ++iRecentlyLostRelocCounter;
+                        // ++iRecentlyLostRelocCounter;
                     }
 
                     Verbose::PrintMess("iRecentlyLostRelocCounter : " + std::to_string(iRecentlyLostRelocCounter), Verbose::VERBOSITY_NORMAL);
@@ -2185,6 +2189,7 @@ namespace ORB_SLAM3
 
                         bool bOKMM = false;
                         bool bOKReloc = false;
+                        bool bOKRelocViaExtBuf = false;
                         vector<MapPoint *> vpMPsMM;
                         vector<bool> vbOutMM;
                         Sophus::SE3f TcwMM;
@@ -2199,10 +2204,17 @@ namespace ORB_SLAM3
                         Verbose::PrintMess("-- Calling Relocalization because last frame used 'visual odometry'", Verbose::VERBOSITY_NORMAL);
                         bOKReloc = Relocalization();
 
+                        if (!bOKReloc)
+                        {
+                            Verbose::PrintMess("-- Calling RelocalizationViaExternalBuffer since Relocalization failed", Verbose::VERBOSITY_NORMAL);
+                            bOKRelocViaExtBuf = RelocalizationViaExternalBuffer();
+                        }
+
                         Verbose::PrintMess("-- TrackWithMotionModel result (bOKMM): " + std::to_string(bOKMM), Verbose::VERBOSITY_NORMAL);
                         Verbose::PrintMess("-- Relocalization result (bOKReloc): " + std::to_string(bOKReloc), Verbose::VERBOSITY_NORMAL);
+                        Verbose::PrintMess("-- RelocalizationViaExternalBuffer result (bOKRelocViaExtBuf): " + std::to_string(bOKRelocViaExtBuf), Verbose::VERBOSITY_NORMAL);
 
-                        if (bOKMM && !bOKReloc)
+                        if (bOKMM && !(bOKReloc || bOKRelocViaExtBuf))
                         {
                             mCurrentFrame.SetPose(TcwMM);
                             mCurrentFrame.mvpMapPoints = vpMPsMM;
@@ -2219,12 +2231,12 @@ namespace ORB_SLAM3
                                 }
                             }
                         }
-                        else if (bOKReloc)
+                        else if (bOKReloc || bOKRelocViaExtBuf)
                         {
                             mbVO = false;
                         }
 
-                        bOK = bOKReloc || bOKMM;
+                        bOK = (bOKReloc || bOKRelocViaExtBuf) || bOKMM;
                     }
                 }
             }
@@ -3108,7 +3120,7 @@ namespace ORB_SLAM3
     bool Tracking::TrackLocalMap()
     {
         TracyZoneScopedNamed("Tracking::TrackLocalMap");
-
+        Verbose::PrintMess("TrackLocalMap started", Verbose::VERBOSITY_NORMAL);
         // We have an estimation of the camera pose and some map points tracked in the frame.
         // We retrieve the local map and try to find matches to points in the local map.
         mTrackedFr++;
@@ -3803,6 +3815,8 @@ namespace ORB_SLAM3
     {
         TracyZoneScopedNamed("Tracking::Relocalization");
 
+        const auto tTimerRef = std::chrono::high_resolution_clock::now();
+
         // increase counter
         sTrackStats.iNumOfRelocalizationCalls++;
         sTrackStats.vRelocStats.push_back(TrackStatistics::RelocStats());
@@ -3815,6 +3829,8 @@ namespace ORB_SLAM3
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
         vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap());
 
+        Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
+
         // NOTE: below did not work, no candidates were being found
         // Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
         // if (vpCandidateKFs.empty())
@@ -3824,8 +3840,6 @@ namespace ORB_SLAM3
         //     Verbose::PrintMess("Relocalization -> running DetectRelocalizationCandidates again with decrease accuracy -> fAccFactor: " + std::to_string(fAccFactor) + " fMinCommonWordsFactor: " + std::to_string(fMinCommonWordsFactor), Verbose::VERBOSITY_NORMAL);
         //     vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap(), fAccFactor, fMinCommonWordsFactor);
         // }
-
-        Verbose::PrintMess("number of keyframe candidates (nKFs): " + std::to_string(vpCandidateKFs.size()), Verbose::VERBOSITY_NORMAL);
 
         sTrackStats.vRelocStats.back().iNumOfKFCandidatesBeforeSearchByBow = vpCandidateKFs.size();
         // reserve spaces for other vectors in sTrackStats
@@ -3999,7 +4013,12 @@ namespace ORB_SLAM3
             }
         }
 
-        Verbose::PrintMess("relocalization -> after while loop", Verbose::VERBOSITY_NORMAL);
+        Verbose::PrintMess("relocalization -> after PnP RANSAC loop, bMatch? : " + std::to_string(bMatch), Verbose::VERBOSITY_NORMAL);
+
+        // calculate elapsed time
+        const auto tTimerNow = std::chrono::high_resolution_clock::now();
+        const auto tElapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(tTimerNow - tTimerRef).count();
+        Verbose::PrintMess("relocalization -> elapsed time (ms): " + std::to_string(tElapsedTime), Verbose::VERBOSITY_NORMAL);
 
         if (!bMatch)
         {
@@ -4016,8 +4035,9 @@ namespace ORB_SLAM3
     }
 
     // this should be triggered in addition to normal Relocalization method and only with localization-only mode, NOT TESTED YET
-    bool Tracking::RelocalizationViaExternalBuffer() // TODO
+    bool Tracking::RelocalizationViaExternalBuffer() // TODO : test
     {
+        const auto tTimerRef = std::chrono::high_resolution_clock::now();
 
         Verbose::PrintMess("Starting RelocalizationViaExternalBuffer", Verbose::VERBOSITY_NORMAL);
         // Compute Bag of Words Vector
@@ -4025,9 +4045,9 @@ namespace ORB_SLAM3
 
         // Relocalization is performed when tracking is lost
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-        vector<AuxiliaryFrame *> vCandidateAuxiliaryFrames = ptrAuxiliaryFrameStorage->GetAuxFrameDB()->DetectCandidates(&mCurrentFrame);
-
-        Verbose::PrintMess("RelocalizationViaExternalBuffer -> number of auxiliary frame candidates: " + std::to_string(vCandidateAuxiliaryFrames.size()), Verbose::VERBOSITY_NORMAL);
+        const auto ptrAuxDB = ptrAuxiliaryFrameStorage->GetAuxFrameDB();
+        Verbose::PrintMess("RelocalizationViaExternalBuffer -> current aux db frame size: " + std::to_string(ptrAuxDB->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
+        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
 
         if (vCandidateAuxiliaryFrames.empty())
         {
@@ -4036,6 +4056,7 @@ namespace ORB_SLAM3
         }
 
         const int nKFs = vCandidateAuxiliaryFrames.size();
+        Verbose::PrintMess("RelocalizationViaExternalBuffer -> number of auxiliary frame candidates: " + std::to_string(nKFs), Verbose::VERBOSITY_NORMAL);
 
         // We perform first an ORB matching with each candidate
         // If enough matches are found we setup a PnP solver
@@ -4054,9 +4075,9 @@ namespace ORB_SLAM3
 
         for (int i = 0; i < nKFs; i++)
         {
-            Frame *pKF = vCandidateAuxiliaryFrames[i]->GetFrame();
+            Frame *pAF = vCandidateAuxiliaryFrames[i]->GetFrame();
 
-            int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
+            int nmatches = matcher.SearchByBoW(pAF, mCurrentFrame, vvpMapPointMatches[i]);
             Verbose::PrintMess("RelocalizationViaExternalBuffer -> nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
             if (nmatches < 15) // default 15
@@ -4182,7 +4203,12 @@ namespace ORB_SLAM3
             }
         }
 
-        Verbose::PrintMess("relocalization -> after while loop", Verbose::VERBOSITY_NORMAL);
+        Verbose::PrintMess("RelocalizationViaExternalBuffer -> after PnP RANSAC loop, bMatch? : " + std::to_string(bMatch), Verbose::VERBOSITY_NORMAL);
+
+        // calculate elapsed time
+        const auto tTimerNow = std::chrono::high_resolution_clock::now();
+        const auto tElapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(tTimerNow - tTimerRef).count();
+        Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(tElapsedTime), Verbose::VERBOSITY_NORMAL);
 
         if (!bMatch)
         {
@@ -4191,7 +4217,7 @@ namespace ORB_SLAM3
         else
         {
             mnLastRelocFrameId = mCurrentFrame.mnId;
-            Verbose::PrintMess("Relocalized!!", Verbose::VERBOSITY_NORMAL);
+            Verbose::PrintMess("RelocalizationViaExternalBuffer -> Relocalized!!", Verbose::VERBOSITY_NORMAL);
             return true;
         }
     }

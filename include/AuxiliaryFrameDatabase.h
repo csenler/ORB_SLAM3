@@ -25,12 +25,12 @@ namespace ORB_SLAM3
         AuxiliaryFrameDatabase() {}
         AuxiliaryFrameDatabase(const ORBVocabulary &voc);
 
-        void add(AuxiliaryFrame *pF);
-        void erase(AuxiliaryFrame *pF);
+        void add(const AuxiliaryFrame &pF);
         void clear();
         void SetORBVocabulary(ORBVocabulary *pORBVoc);
-
+        int getTotalFrameSize() const;
         void truncateDatabase();
+        DBoW2::BowVector computeAuxiliaryBoW(Frame *pF);
 
         // TODO:
         // DetectCandidates by iterating through the list of frames in the inverted file
@@ -40,16 +40,17 @@ namespace ORB_SLAM3
 
     protected:
         // Associated vocabulary
-        const ORBVocabulary *pVoc;
+        std::shared_ptr<ORBVocabulary> pVoc{nullptr};
 
         // Inverted file
-        std::vector<list<AuxiliaryFrame *>> vInvertedFile;
+        std::vector<list<std::shared_ptr<AuxiliaryFrame>>> vInvertedFile;
         // StackBuffer<list<AuxiliaryFrame *>> bufInvertedFile;
 
         // Mutex
         std::mutex mMutex;
 
-        inline static int AUX_DB_CAPACITY = 1000;
+        inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds
+        inline static int AUX_DB_CAPACITY_TOTAL = 0;
     };
 
 } // namespace ORB_SLAM
