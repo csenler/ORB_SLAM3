@@ -78,6 +78,7 @@ namespace ORB_SLAM3
         long unsigned int maxKFid = 0;
 
         const int nExpectedSize = (vpKFs.size()) * vpMP.size();
+        std::cout << "BundleAdjustment expected size: " << nExpectedSize << std::endl;
 
         vector<ORB_SLAM3::EdgeSE3ProjectXYZ *> vpEdgesMono;
         vpEdgesMono.reserve(nExpectedSize);
@@ -105,6 +106,8 @@ namespace ORB_SLAM3
 
         vector<MapPoint *> vpMapPointEdgeStereo;
         vpMapPointEdgeStereo.reserve(nExpectedSize);
+
+        std::cout << "BundleAdjustment vectors reserved successfully!" << std::endl;
 
         // Set KeyFrame vertices
 
@@ -270,6 +273,7 @@ namespace ORB_SLAM3
         }
 
         // Optimize!
+        Verbose::PrintMess("BA: starting optimiztion...", Verbose::VERBOSITY_NORMAL);
         optimizer.setVerbose(false);
         optimizer.initializeOptimization();
         optimizer.optimize(nIterations);
