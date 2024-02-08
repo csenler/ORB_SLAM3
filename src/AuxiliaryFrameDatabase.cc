@@ -91,12 +91,21 @@ namespace ORB_SLAM3
 
     std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectCandidates(Frame *pF)
     {
-        // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-        auto vBow = computeAuxiliaryBoW(pF);
+        std::unique_ptr<DBoW2::BowVector> pBowVec = nullptr;
+        // TODO: check if vocabulary is same here
+        if (pF->mBowVec.empty())
+        {
+            // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
+            pBowVec = std::make_unique<DBoW2::BowVector>(computeAuxiliaryBoW(pF));
+        }
+        else
+        {
+            pBowVec = std::make_unique<DBoW2::BowVector>(pF->mBowVec);
+        }
 
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
-        for (auto vit = vBow.begin(), vend = vBow.end(); vit != vend; vit++)
+        for (auto vit = pBowVec->begin(), vend = pBowVec->end(); vit != vend; vit++)
         {
             for (auto &auxFrame : vInvertedFile[vit->first])
             {
@@ -138,7 +147,7 @@ namespace ORB_SLAM3
             if (auxFrame->mnRelocWords > minCommonWords)
             {
                 nscores++;
-                float si = pVoc->score(vBow, auxFrame->GetFrame()->mBowVec);
+                float si = pVoc->score(*(pBowVec.get()), auxFrame->GetFrame()->mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -162,6 +171,112 @@ namespace ORB_SLAM3
         }
 
         return vAuxFrames;
+    }
+
+    // use only candidatesNum number of candidates
+    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNCandidates(Frame *pF, int candidatesNum)
+    {
+        std::unique_ptr<DBoW2::BowVector> pBowVec = nullptr;
+        // TODO: check if vocabulary is same here
+        if (pF->mBowVec.empty())
+        {
+            // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
+            pBowVec = std::make_unique<DBoW2::BowVector>(computeAuxiliaryBoW(pF));
+        }
+        else
+        {
+            pBowVec = std::make_unique<DBoW2::BowVector>(pF->mBowVec);
+        }
+
+        list<AuxiliaryFrame *> lFramesSharingWords;
+        // find all frames sharing words with the query
+        for (auto vit = pBowVec->begin(), vend = pBowVec->end(); vit != vend; vit++)
+        {
+            // last candidatesNum of inverted file list will be used
+            if (vInvertedFile[vit->first].empty())
+                continue;
+
+            const auto &tempListRef = vInvertedFile[vit->first];
+            int count = 0;
+            for (auto rit = tempListRef.rbegin(); rit != tempListRef.rend(); ++rit)
+            {
+                auto &auxFrame = *rit;
+                if (auxFrame) // TODO: without this check, it crashes, figure out real reason, list should not contain nullptr
+                {
+                    if (auxFrame->mnRelocQuery != pF->mnId)
+                    {
+                        auxFrame->mnRelocWords = 0;
+                        auxFrame->mnRelocQuery = pF->mnId;
+                        lFramesSharingWords.push_back(auxFrame.get());
+                        count++;
+
+                        if (count == candidatesNum)
+                            break;
+                    }
+                    auxFrame->mnRelocWords++;
+                }
+            }
+            if (count == candidatesNum)
+                break;
+        }
+
+        if (lFramesSharingWords.empty())
+        {
+            return std::vector<AuxiliaryFrame *>();
+        }
+
+        // Only compare against those keyframes that share enough words
+        int maxCommonWords = 0;
+        for (const auto auxFrame : lFramesSharingWords)
+        {
+            if (auxFrame->mnRelocWords > maxCommonWords)
+            {
+                maxCommonWords = auxFrame->mnRelocWords;
+            }
+        }
+
+        int minCommonWords = maxCommonWords * 0.8f;
+
+        list<pair<float, AuxiliaryFrame *>> lScoreAndMatch;
+
+        int nscores = 0;
+
+        // Compute similarity and best score
+        float bestAccScore = 0;
+        for (const auto auxFrame : lFramesSharingWords)
+        {
+            if (auxFrame->mnRelocWords > minCommonWords)
+            {
+                nscores++;
+                float si = pVoc->score(*(pBowVec.get()), auxFrame->GetFrame()->mBowVec);
+                if (si > bestAccScore)
+                {
+                    bestAccScore = si;
+                }
+                lScoreAndMatch.push_back(make_pair(si, auxFrame));
+            }
+        }
+
+        if (lScoreAndMatch.empty())
+            return std::vector<AuxiliaryFrame *>();
+
+        // return those that are within the 80% of the best score
+        std::vector<AuxiliaryFrame *> vAuxFrames;
+        vAuxFrames.reserve(lScoreAndMatch.size());
+        for (const auto &scoreAndMatch : lScoreAndMatch)
+        {
+            if (scoreAndMatch.first > 0.8f * bestAccScore)
+            {
+                vAuxFrames.push_back(scoreAndMatch.second);
+            }
+        }
+
+        return vAuxFrames;
+    }
+
+    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNBestCandidates(Frame *pF, int candidatesNum)
+    {
+        // TODO
     }
 
     std::vector<KeyFrame *> AuxiliaryFrameDatabase::DetectCandidatesViaKFs(Frame *pF)

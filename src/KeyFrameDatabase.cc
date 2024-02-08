@@ -782,7 +782,7 @@ namespace ORB_SLAM3
         for (list<pair<float, KeyFrame *>>::iterator it = lScoreAndMatch.begin(), itend = lScoreAndMatch.end(); it != itend; it++)
         {
             KeyFrame *pKFi = it->second;
-            vector<KeyFrame *> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(10);
+            vector<KeyFrame *> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(20); // default was 10
 
             float bestScore = it->first;
             float accScore = bestScore;

@@ -119,7 +119,7 @@ namespace ORB_SLAM3
             }
         }
 
-        // setup auxiliary frame database
+        // setup auxiliary frame database TODO: should initialize this only in "load" mode
         ptrAuxiliaryFrameStorage = new AuxiliaryFrameStorage(mpORBVocabulary);
 
 #ifdef REGISTER_TIMES
@@ -1682,7 +1682,7 @@ namespace ORB_SLAM3
         sTrackStats.bVelocityFlag = mbVelocity;
 
         // pass frame to external storage if it was Tracked
-        if (mState == eTrackingState::OK)
+        if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK)
         {
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (before add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
             ptrAuxiliaryFrameStorage->addFrameToStorage(mCurrentFrame);
@@ -3919,9 +3919,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
-                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
+                // bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 std::cout << "after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
 
                 sTrackStats.vRelocStats.back().vNumOfInliers[i] = nInliers;
@@ -4037,6 +4037,12 @@ namespace ORB_SLAM3
     // this should be triggered in addition to normal Relocalization method and only with localization-only mode, NOT TESTED YET
     bool Tracking::RelocalizationViaExternalBuffer() // TODO : test
     {
+        if (!ptrAuxiliaryFrameStorage)
+        {
+            Verbose::PrintMess("RelocalizationViaExternalBuffer -> ptrAuxiliaryFrameStorage is NULL", Verbose::VERBOSITY_NORMAL);
+            return false;
+        }
+
         const auto tTimerRef = std::chrono::high_resolution_clock::now();
 
         Verbose::PrintMess("Starting RelocalizationViaExternalBuffer", Verbose::VERBOSITY_NORMAL);
@@ -4047,7 +4053,8 @@ namespace ORB_SLAM3
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
         const auto ptrAuxDB = ptrAuxiliaryFrameStorage->GetAuxFrameDB();
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> current aux db frame size: " + std::to_string(ptrAuxDB->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
-        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
+        // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
+        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(&mCurrentFrame, 30);
 
         if (vCandidateAuxiliaryFrames.empty())
         {
@@ -4115,9 +4122,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
-                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
+                // bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 std::cout << "RelocalizationViaExternalBuffer -> after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
 
                 // If Ransac reachs max. iterations discard keyframe

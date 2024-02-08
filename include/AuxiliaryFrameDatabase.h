@@ -35,6 +35,10 @@ namespace ORB_SLAM3
         // TODO:
         // DetectCandidates by iterating through the list of frames in the inverted file
         std::vector<AuxiliaryFrame *> DetectCandidates(Frame *pF);
+        // Detect a given number of candidates to save time
+        std::vector<AuxiliaryFrame *> DetectNCandidates(Frame *pF, int candidatesNum);
+        // Detect Best Candidates to save time
+        std::vector<AuxiliaryFrame *> DetectNBestCandidates(Frame *pF, int candidatesNum);
         // DetectCandidates by iterating thrgough reference keyframe of each frame in the inverted file
         std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame *pF);
 
@@ -49,7 +53,7 @@ namespace ORB_SLAM3
         // Mutex
         std::mutex mMutex;
 
-        inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds
+        inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds = 300 frames
         inline static int AUX_DB_CAPACITY_TOTAL = 0;
     };
 
