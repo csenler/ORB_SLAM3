@@ -119,8 +119,12 @@ namespace ORB_SLAM3
             }
         }
 
-        // setup auxiliary frame database TODO: should initialize this only in "load" mode
-        ptrAuxiliaryFrameStorage = new AuxiliaryFrameStorage(mpORBVocabulary);
+        // setup auxiliary frame database TODO: since we are setting this variable after Tracking is created, this is useless for now
+        if (bIsLoadMode.load())
+        {
+            std::cout << "System is in 'Load Mode', initializing auxiliary frame database !!!" << std::endl;
+            ptrAuxiliaryFrameStorage = std::make_unique<AuxiliaryFrameStorage>(mpORBVocabulary);
+        }
 
 #ifdef REGISTER_TIMES
         vdRectStereo_ms.clear();
@@ -1681,7 +1685,7 @@ namespace ORB_SLAM3
 
         sTrackStats.bVelocityFlag = mbVelocity;
 
-        // pass frame to external storage if it was Tracked
+        // pass frame to external storage if it was Tracked, this should only be active in "Load" mode
         if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK)
         {
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (before add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);

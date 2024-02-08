@@ -208,7 +208,7 @@ namespace ORB_SLAM3
         }
 
         // statistics for measuring Track success
-        struct TrackStatistics
+        struct TrackStatistics // TODO: update this for new RelocalizationWithExternalBuffer method
         {
             TrackStatistics()
             {
@@ -313,6 +313,18 @@ namespace ORB_SLAM3
         } sTrackStats;
 
         cv::Mat getCurrentViewerFrame() const;
+
+        void notifyTrackingLoadMode(const bool &bIsLoadMode_)
+        {
+            bIsLoadMode.store(bIsLoadMode_);
+
+            // auxiliary db probably not initialized yet since Tracker constructor is already called, therefore initialize it here just in case
+            if (bIsLoadMode_ && !ptrAuxiliaryFrameStorage)
+            {
+                // orb vocabulary should already be given as constructor argument at this point
+                ptrAuxiliaryFrameStorage = std::make_unique<AuxiliaryFrameStorage>(mpORBVocabulary);
+            }
+        }
 
     protected:
         // Main tracking function. It is independent of the input sensor.
@@ -552,7 +564,10 @@ namespace ORB_SLAM3
             AuxiliaryFrameDatabase auxFrameDB;
         };
 
-        AuxiliaryFrameStorage *ptrAuxiliaryFrameStorage{nullptr};
+        std::unique_ptr<AuxiliaryFrameStorage> ptrAuxiliaryFrameStorage{nullptr};
+
+        // flag to indicate if slam_node is running in "load" or "save" mode
+        std::atomic<bool> bIsLoadMode{false};
 
     public:
         cv::Mat mImRight;
