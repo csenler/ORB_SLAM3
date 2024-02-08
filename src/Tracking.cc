@@ -3923,9 +3923,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
-                // bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
+                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 std::cout << "after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
 
                 sTrackStats.vRelocStats.back().vNumOfInliers[i] = nInliers;
@@ -4024,6 +4024,8 @@ namespace ORB_SLAM3
         const auto tElapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(tTimerNow - tTimerRef).count();
         Verbose::PrintMess("relocalization -> elapsed time (ms): " + std::to_string(tElapsedTime), Verbose::VERBOSITY_NORMAL);
 
+        sTrackStats.vRelocStats.back().iRelocalizaionElapsedTimeMs = tElapsedTime;
+
         if (!bMatch)
         {
             sTrackStats.vRelocStats.back().bRelocSuccess = false;
@@ -4112,8 +4114,12 @@ namespace ORB_SLAM3
         bool bMatch = false;
         ORBmatcher matcher2(0.9 * iORBmatcherMultiplicationFactor, true);
 
-        while (nCandidates > 0 && !bMatch)
+        const int iLoopLimit = 20; // to limit while loop below in order to prevent spending too much time, happens when "nGood<10" case
+        int iLoopCounter = 0;
+
+        while (nCandidates > 0 && !bMatch && iLoopCounter < iLoopLimit)
         {
+            iLoopCounter++;
             for (int i = 0; i < nKFs; i++)
             {
                 if (vbDiscarded[i])
@@ -4126,9 +4132,9 @@ namespace ORB_SLAM3
 
                 MLPnPsolver *pSolver = vpMLPnPsolvers[i];
                 Eigen::Matrix4f eigTcw;
-                bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
+                // bool bTcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers, eigTcw); // default
                 // bool bTcw = pSolver->iterate(15, bNoMore, vbInliers, nInliers, eigTcw); // WHY? : causes infinite loop sometimes
-                // bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
+                bool bTcw = pSolver->iterate(iRelocPnPSolverIteration, bNoMore, vbInliers, nInliers, eigTcw);
                 std::cout << "RelocalizationViaExternalBuffer -> after PnPSolver iterate, bNoMore: " << bNoMore << " bTcw: " << bTcw << " inlier size: " << vbInliers.size() << std::endl;
 
                 // If Ransac reachs max. iterations discard keyframe
@@ -4220,6 +4226,8 @@ namespace ORB_SLAM3
         const auto tTimerNow = std::chrono::high_resolution_clock::now();
         const auto tElapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(tTimerNow - tTimerRef).count();
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(tElapsedTime), Verbose::VERBOSITY_NORMAL);
+
+        sTrackStats.vRelocStats.back().iRelocWithExtBufElapsedTimeMs = tElapsedTime;
 
         if (!bMatch)
         {

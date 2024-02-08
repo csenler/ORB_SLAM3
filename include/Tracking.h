@@ -306,6 +306,10 @@ namespace ORB_SLAM3
                 std::vector<int> vAdditionalMatchesAfterPoseOptimization; // after pose optimization, calculated if not enough inliers, for  each candidate KF
                 std::vector<int> vNumOfResultantGoodInliers;              // at the end of relocation, for each candidate KF
                 bool bRelocSuccess{false};
+
+                // elapsed times
+                int iRelocalizaionElapsedTimeMs{0};
+                int iRelocWithExtBufElapsedTimeMs{0};
             };
 
             std::vector<RelocStats> vRelocStats;
