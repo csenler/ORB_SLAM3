@@ -77,7 +77,7 @@ namespace ORB_SLAM3
 
         long unsigned int maxKFid = 0;
 
-        const int nExpectedSize = (vpKFs.size()) * vpMP.size();
+        const auto nExpectedSize = (vpKFs.size()) * vpMP.size();
         std::cout << "BundleAdjustment expected size: " << nExpectedSize << std::endl;
 
         vector<ORB_SLAM3::EdgeSE3ProjectXYZ *> vpEdgesMono;
