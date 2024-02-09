@@ -45,6 +45,9 @@ namespace ORB_SLAM3
         std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame *pF);
 
     protected:
+        inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds = 300 frames
+        inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 0;
+
         // Associated vocabulary
         std::shared_ptr<ORBVocabulary> pVoc{nullptr};
 
@@ -57,9 +60,6 @@ namespace ORB_SLAM3
 
         // Mutex
         std::mutex mMutex;
-
-        inline static int AUX_DB_CAPACITY_PER_WORD = 1000; // if 30 fps, 10 seconds = 300 frames
-        inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 0;
     };
 
 } // namespace ORB_SLAM

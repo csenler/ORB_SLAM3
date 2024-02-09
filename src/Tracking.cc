@@ -4202,8 +4202,6 @@ namespace ORB_SLAM3
                         if (mCurrentFrame.mvbOutlier[io])
                             mCurrentFrame.mvpMapPoints[io] = static_cast<MapPoint *>(NULL);
 
-                    // TODO: should use SearchByProjection for TrackWithMotionModel instead of the 2 below???
-
                     // If few inliers, search by projection in a coarse window and optimize again
                     if (nGood < nGoodUpperBound)
                     {
