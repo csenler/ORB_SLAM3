@@ -534,11 +534,10 @@ namespace ORB_SLAM3
                 auxFrameDB.SetORBVocabulary(ptrORBVocabulary);
             }
 
-            void addFrameToStorage(const Frame &frame)
+            void addFrameToStorage(Frame &frame)
             {
-                // create AuxiliaryFrame object and add to storage
-                AuxiliaryFrame auxFrame(frame);
-                auxFrameDB.add(auxFrame);
+                // add to auxiliary storage
+                auxFrameDB.add(frame);
             }
 
             // void addFrameToStorage(Frame *pFrame)

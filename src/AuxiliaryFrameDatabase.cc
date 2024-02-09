@@ -29,13 +29,13 @@ namespace ORB_SLAM3
         return nSize;
     }
 
-    bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const AuxiliaryFrame &frame)
+    bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const Frame &refFrame)
     {
         if (!ptrLastFrame)
             return true; // initial case
 
         // compute similarty score between last frame and new frame using vocabulary's score function (returns between [0,1]), if similarity is above a threshold, do not add to DB
-        const auto similarityScore = pVoc->score(frame.GetFrame()->mBowVec, ptrLastFrame->GetFrame()->mBowVec);
+        const auto similarityScore = pVoc->score(refFrame.mBowVec, ptrLastFrame->GetFrame()->mBowVec);
         std::cout << "AuxiliaryFrameDatabase::shouldBeAddedToDb -> similarity score : " << similarityScore << std::endl;
         if (similarityScore > 0.85f)
         {
@@ -47,20 +47,12 @@ namespace ORB_SLAM3
         }
     }
 
-    void AuxiliaryFrameDatabase::add(const AuxiliaryFrame &refFrame)
+    void AuxiliaryFrameDatabase::add(Frame &refFrame)
     {
-        const auto pFrame = refFrame.GetFrame();
-
-        if (!pFrame)
+        if (refFrame.mBowVec.empty())
         {
-            std::cerr << "AuxiliaryFrameDatabase::add -> Frame is nullptr !!!" << std::endl;
-            return;
-        }
-
-        if (pFrame->mBowVec.empty())
-        {
-            vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(pFrame->mDescriptors);
-            pVoc->transform(vCurrentDesc, pFrame->mBowVec, pFrame->mFeatVec, 4);
+            vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(refFrame.mDescriptors);
+            pVoc->transform(vCurrentDesc, refFrame.mBowVec, refFrame.mFeatVec, 4);
         }
 
         if (shouldBeAddedToDb(refFrame)) // TODO: test this
@@ -68,7 +60,7 @@ namespace ORB_SLAM3
             // save the last frame that has been added to the database
             ptrLastFrame = std::make_shared<AuxiliaryFrame>(refFrame); // need to use std::move here?
 
-            for (auto vit = pFrame->mBowVec.begin(), vend = pFrame->mBowVec.end(); vit != vend; vit++)
+            for (auto vit = refFrame.mBowVec.begin(), vend = refFrame.mBowVec.end(); vit != vend; vit++)
             {
                 vInvertedFile[vit->first].push_back(ptrLastFrame);
 
@@ -76,6 +68,7 @@ namespace ORB_SLAM3
                 if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
                 {
                     std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
+                    vInvertedFile[vit->first].front().reset(); // release the memory
                     vInvertedFile[vit->first].pop_front();
                 }
             }

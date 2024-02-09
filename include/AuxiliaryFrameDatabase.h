@@ -25,7 +25,7 @@ namespace ORB_SLAM3
         AuxiliaryFrameDatabase() {}
         AuxiliaryFrameDatabase(const ORBVocabulary &voc);
 
-        void add(const AuxiliaryFrame &pF);
+        void add(Frame &pF);
         void clear();
         void SetORBVocabulary(ORBVocabulary *pORBVoc);
         int getTotalFrameSize() const;
@@ -33,7 +33,7 @@ namespace ORB_SLAM3
         DBoW2::BowVector computeAuxiliaryBoW(Frame *pF);
 
         // compute similarity score between two frames and decide whether to add the frame to the database
-        bool shouldBeAddedToDb(const AuxiliaryFrame &frame); // TODO
+        bool shouldBeAddedToDb(const Frame &refFrame);
 
         // DetectCandidates by iterating through the list of frames in the inverted file
         std::vector<AuxiliaryFrame *> DetectCandidates(Frame *pF);

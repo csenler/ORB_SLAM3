@@ -21,7 +21,7 @@ namespace ORB_SLAM3
 
         AuxiliaryFrame(const Frame &frame)
         {
-            pFrame = std::make_shared<Frame>(frame);
+            pFrame = std::make_unique<Frame>(Frame(frame));
         }
 
         Frame *GetFrame() const
@@ -36,7 +36,7 @@ namespace ORB_SLAM3
 
     protected:
         // original frame, shared_ptr so that we can get ownership from reference
-        std::shared_ptr<Frame> pFrame{nullptr};
+        std::unique_ptr<Frame> pFrame{nullptr};
     };
 
 } // namespace ORB_SLAM
