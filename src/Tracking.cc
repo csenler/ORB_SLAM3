@@ -1685,6 +1685,8 @@ namespace ORB_SLAM3
 
         sTrackStats.bVelocityFlag = mbVelocity;
 
+        const auto retPose = mCurrentFrame.GetPose(); // save pose to return later
+
         // pass frame to external storage if it was Tracked, this should only be active in "Load" mode
         if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK)
         {
@@ -1693,7 +1695,7 @@ namespace ORB_SLAM3
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (after add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
         }
 
-        return mCurrentFrame.GetPose();
+        return retPose;
     }
 
     void Tracking::GrabImuData(const IMU::Point &imuMeasurement)
@@ -3909,8 +3911,20 @@ namespace ORB_SLAM3
         bool bMatch = false;
         ORBmatcher matcher2(0.9 * iORBmatcherMultiplicationFactor, true);
 
+        // to limit while loop below in order to prevent spending too much time, happens when "nGood<10" case
+        const auto timeRef = std::chrono::high_resolution_clock::now();
+
         while (nCandidates > 0 && !bMatch)
         {
+            // check elapsed time
+            const auto timeNow = std::chrono::high_resolution_clock::now();
+            const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
+            if (elapsedTime > 100)
+            {
+                Verbose::PrintMess("Relocalization -> elapsed time (ms): " + std::to_string(elapsedTime) + " -> breaking while loop", Verbose::VERBOSITY_NORMAL);
+                break;
+            }
+
             for (int i = 0; i < nKFs; i++)
             {
                 if (vbDiscarded[i])
@@ -4114,12 +4128,20 @@ namespace ORB_SLAM3
         bool bMatch = false;
         ORBmatcher matcher2(0.9 * iORBmatcherMultiplicationFactor, true);
 
-        const int iLoopLimit = 20; // to limit while loop below in order to prevent spending too much time, happens when "nGood<10" case
-        int iLoopCounter = 0;
+        // to limit while loop below in order to prevent spending too much time, happens when "nGood<10" case
+        const auto timeRef = std::chrono::high_resolution_clock::now();
 
-        while (nCandidates > 0 && !bMatch && iLoopCounter < iLoopLimit)
+        while (nCandidates > 0 && !bMatch)
         {
-            iLoopCounter++;
+            // check elapsed time
+            const auto timeNow = std::chrono::high_resolution_clock::now();
+            const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
+            if (elapsedTime > 100)
+            {
+                Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(elapsedTime) + " -> breaking while loop", Verbose::VERBOSITY_NORMAL);
+                break;
+            }
+
             for (int i = 0; i < nKFs; i++)
             {
                 if (vbDiscarded[i])

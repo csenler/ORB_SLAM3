@@ -29,6 +29,24 @@ namespace ORB_SLAM3
         return nSize;
     }
 
+    bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const AuxiliaryFrame &frame)
+    {
+        if (!ptrLastFrame)
+            return true; // initial case
+
+        // compute similarty score between last frame and new frame using vocabulary's score function (returns between [0,1]), if similarity is above a threshold, do not add to DB
+        const auto similarityScore = pVoc->score(frame.GetFrame()->mBowVec, ptrLastFrame->GetFrame()->mBowVec);
+        std::cout << "AuxiliaryFrameDatabase::shouldBeAddedToDb -> similarity score : " << similarityScore << std::endl;
+        if (similarityScore > 0.85f)
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
     void AuxiliaryFrameDatabase::add(const AuxiliaryFrame &refFrame)
     {
         const auto pFrame = refFrame.GetFrame();
@@ -44,20 +62,27 @@ namespace ORB_SLAM3
             vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(pFrame->mDescriptors);
             pVoc->transform(vCurrentDesc, pFrame->mBowVec, pFrame->mFeatVec, 4);
         }
-        for (auto vit = pFrame->mBowVec.begin(), vend = pFrame->mBowVec.end(); vit != vend; vit++)
+
+        if (shouldBeAddedToDb(refFrame)) // TODO: test this
         {
-            vInvertedFile[vit->first].push_back(std::make_shared<AuxiliaryFrame>(refFrame));
+            // save the last frame that has been added to the database
+            ptrLastFrame = std::make_shared<AuxiliaryFrame>(refFrame); // need to use std::move here?
 
-            // check for truncation
-            if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
+            for (auto vit = pFrame->mBowVec.begin(), vend = pFrame->mBowVec.end(); vit != vend; vit++)
             {
-                std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
-                vInvertedFile[vit->first].pop_front();
-            }
-        }
+                vInvertedFile[vit->first].push_back(ptrLastFrame);
 
-        // truncate if needed
-        // truncateDatabase();
+                // check for truncation
+                if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
+                {
+                    std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
+                    vInvertedFile[vit->first].pop_front();
+                }
+            }
+
+            // truncate if needed
+            // truncateDatabase();
+        }
     }
 
     void AuxiliaryFrameDatabase::truncateDatabase()
