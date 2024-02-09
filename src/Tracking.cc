@@ -3919,7 +3919,7 @@ namespace ORB_SLAM3
             // check elapsed time
             const auto timeNow = std::chrono::high_resolution_clock::now();
             const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
-            if (elapsedTime > 100)
+            if (elapsedTime > 150)
             {
                 Verbose::PrintMess("Relocalization -> elapsed time (ms): " + std::to_string(elapsedTime) + " -> breaking while loop", Verbose::VERBOSITY_NORMAL);
                 break;
@@ -4115,7 +4115,7 @@ namespace ORB_SLAM3
             else
             {
                 MLPnPsolver *pSolver = new MLPnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
-                pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 5.991); // This solver needs at least 6 points
+                pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 7.0); // This solver needs at least 6 points
                 vpMLPnPsolvers[i] = pSolver;
                 nCandidates++;
             }
@@ -4131,12 +4131,16 @@ namespace ORB_SLAM3
         // to limit while loop below in order to prevent spending too much time, happens when "nGood<10" case
         const auto timeRef = std::chrono::high_resolution_clock::now();
 
+        const int nGoodLowerBound = 20;    // default 30
+        const int nGoodUpperBound = 40;    // default 50
+        const int nGoodFailThreshold = 10; // default 10
+
         while (nCandidates > 0 && !bMatch)
         {
             // check elapsed time
             const auto timeNow = std::chrono::high_resolution_clock::now();
             const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
-            if (elapsedTime > 100)
+            if (elapsedTime > 150)
             {
                 Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(elapsedTime) + " -> breaking while loop", Verbose::VERBOSITY_NORMAL);
                 break;
@@ -4191,7 +4195,7 @@ namespace ORB_SLAM3
                     int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
                     // std::cout << "nGood: " << nGood << std::endl;
 
-                    if (nGood < 10)
+                    if (nGood < nGoodFailThreshold)
                         continue;
 
                     for (int io = 0; io < mCurrentFrame.N; io++)
@@ -4201,26 +4205,26 @@ namespace ORB_SLAM3
                     // TODO: should use SearchByProjection for TrackWithMotionModel instead of the 2 below???
 
                     // If few inliers, search by projection in a coarse window and optimize again
-                    if (nGood < 50)
+                    if (nGood < nGoodUpperBound)
                     {
-                        int nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 10, 100);
+                        int nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 10, 200); // default th=10, ORBdist=100
 
-                        if (nadditional + nGood >= 50)
+                        if (nadditional + nGood >= nGoodUpperBound)
                         {
                             nGood = Optimizer::PoseOptimization(&mCurrentFrame);
 
                             // If many inliers but still not enough, search by projection again in a narrower window
                             // the camera has been already optimized with many points
-                            if (nGood > 30 && nGood < 50)
+                            if (nGood > nGoodLowerBound && nGood < nGoodUpperBound)
                             {
                                 sFound.clear();
                                 for (int ip = 0; ip < mCurrentFrame.N; ip++)
                                     if (mCurrentFrame.mvpMapPoints[ip])
                                         sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
-                                nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 3, 64);
+                                nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 3, 128); // default th=3, ORBdist=64
 
                                 // Final optimization
-                                if (nGood + nadditional >= 50)
+                                if (nGood + nadditional >= nGoodUpperBound)
                                 {
                                     nGood = Optimizer::PoseOptimization(&mCurrentFrame);
 
@@ -4233,7 +4237,7 @@ namespace ORB_SLAM3
                     }
 
                     // If the pose is supported by enough inliers stop ransacs and continue
-                    if (nGood >= 50)
+                    if (nGood >= nGoodUpperBound)
                     {
                         bMatch = true;
                         break;

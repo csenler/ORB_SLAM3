@@ -323,11 +323,16 @@ namespace ORB_SLAM3
             bIsLoadMode.store(bIsLoadMode_);
 
             // auxiliary db probably not initialized yet since Tracker constructor is already called, therefore initialize it here just in case
-            if (bIsLoadMode_ && !ptrAuxiliaryFrameStorage)
+            if (bIsLoadMode_ && !ptrAuxiliaryFrameStorage && !bDisableAuxiliaryDB.load())
             {
                 // orb vocabulary should already be given as constructor argument at this point
                 ptrAuxiliaryFrameStorage = std::make_unique<AuxiliaryFrameStorage>(mpORBVocabulary);
             }
+        }
+
+        void setDisableAuxiliaryFrameDB(const bool &bDisableAuxiliaryDB_)
+        {
+            bDisableAuxiliaryDB.store(bDisableAuxiliaryDB_);
         }
 
     protected:
@@ -572,6 +577,9 @@ namespace ORB_SLAM3
 
         // flag to indicate if slam_node is running in "load" or "save" mode
         std::atomic<bool> bIsLoadMode{false};
+
+        // auxiliary db diasble flag
+        std::atomic<bool> bDisableAuxiliaryDB{false};
 
     public:
         cv::Mat mImRight;
