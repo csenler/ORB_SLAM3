@@ -159,6 +159,12 @@ namespace ORB_SLAM3
             return strSaveUUID;
         }
 
+        std::vector<uint> getLoadedMapIDs()
+        {
+            unique_lock<mutex> lock(mMutexLoadedMapIDs);
+            return mvLoadedMapIDs;
+        }
+
     protected:
         std::set<Map *> mspMaps;
         std::set<Map *> mspBadMaps;
@@ -184,6 +190,10 @@ namespace ORB_SLAM3
         // uuid
         std::string strSaveUUID;
         std::mutex mMutexSaveUUID;
+
+        // loaded map IDs
+        std::vector<uint> mvLoadedMapIDs;
+        std::mutex mMutexLoadedMapIDs;
 
     }; // class Atlas
 

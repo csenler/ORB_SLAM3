@@ -251,6 +251,8 @@ namespace ORB_SLAM3
             bool bVelocityFlag{false};
             int iNumOfKeyFrames{0}; // this may be useful when in mapping(slam) mode
             int iNumOfMapPoints{0}; // this may be useful when in mapping(slam) mode
+            bool bIsLoadedMap{false};
+            int iCurrentMapID{-1};
 
             struct RelocStats
             {
