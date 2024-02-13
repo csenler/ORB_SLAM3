@@ -4075,6 +4075,7 @@ namespace ORB_SLAM3
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> current aux db frame size: " + std::to_string(ptrAuxDB->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
         // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
         auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(&mCurrentFrame, 30);
+        // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNBestCandidates(&mCurrentFrame, 30); // NOTE: worse performance than DetectNCandidates, very few inliers if any
 
         if (vCandidateAuxiliaryFrames.empty())
         {
@@ -4107,7 +4108,7 @@ namespace ORB_SLAM3
             int nmatches = matcher.SearchByBoW(pAF, mCurrentFrame, vvpMapPointMatches[i]);
             Verbose::PrintMess("RelocalizationViaExternalBuffer -> nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
-            if (nmatches < 15) // default 15
+            if (nmatches < 10) // default 15
             {
                 vbDiscarded[i] = true;
                 continue;
@@ -4115,13 +4116,18 @@ namespace ORB_SLAM3
             else
             {
                 MLPnPsolver *pSolver = new MLPnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
-                pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 7.0); // This solver needs at least 6 points
+                pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 5.991); // This solver needs at least 6 points
                 vpMLPnPsolvers[i] = pSolver;
                 nCandidates++;
             }
+
+            // MLPnPsolver *pSolver = new MLPnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
+            // pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 7.0); // This solver needs at least 6 points
+            // vpMLPnPsolvers[i] = pSolver;
+            // nCandidates++;
         }
 
-        Verbose::PrintMess("RelocalizationViaExternalBuffer -> Number of Candidates after PnPSolve (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
+        Verbose::PrintMess("RelocalizationViaExternalBuffer -> Number of Candidates after BoW matching (nCandidates): " + std::to_string(nCandidates), Verbose::VERBOSITY_NORMAL);
 
         // Alternatively perform some iterations of P4P RANSAC
         // Until we found a camera pose supported by enough inliers
@@ -4140,7 +4146,7 @@ namespace ORB_SLAM3
             // check elapsed time
             const auto timeNow = std::chrono::high_resolution_clock::now();
             const auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
-            if (elapsedTime > 150)
+            if (elapsedTime > 100)
             {
                 Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(elapsedTime) + " -> breaking while loop", Verbose::VERBOSITY_NORMAL);
                 break;
@@ -4205,7 +4211,7 @@ namespace ORB_SLAM3
                     // If few inliers, search by projection in a coarse window and optimize again
                     if (nGood < nGoodUpperBound)
                     {
-                        int nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 10, 200); // default th=10, ORBdist=100
+                        int nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 10, 100); // default th=10, ORBdist=100
 
                         if (nadditional + nGood >= nGoodUpperBound)
                         {
@@ -4219,7 +4225,7 @@ namespace ORB_SLAM3
                                 for (int ip = 0; ip < mCurrentFrame.N; ip++)
                                     if (mCurrentFrame.mvpMapPoints[ip])
                                         sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
-                                nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 3, 128); // default th=3, ORBdist=64
+                                nadditional = matcher2.SearchByProjection(mCurrentFrame, vCandidateAuxiliaryFrames[i]->GetFrame(), sFound, 3, 64); // default th=3, ORBdist=64
 
                                 // Final optimization
                                 if (nGood + nadditional >= nGoodUpperBound)

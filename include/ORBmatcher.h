@@ -50,8 +50,10 @@ namespace ORB_SLAM3
         // Used in relocalisation (Tracking)
         int SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const std::set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist);
 
-        // search by using auxiliary frame database instead of keyframe database
+        // (for use with aux db) search by using auxiliary frame database instead of keyframe database
         int SearchByProjection(Frame &CurrentFrame, Frame *pKF, const set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist);
+        // (for use with aux db) search without excluding any points found before
+        int SearchByProjection(Frame &CurrentFrame, Frame *pF, const float th, const int ORBdist);
 
         // Project MapPoints using a Similarity Transformation and search matches.
         // Used in loop detection (Loop Closing)

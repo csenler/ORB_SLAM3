@@ -34,6 +34,9 @@ namespace ORB_SLAM3
         int mnRelocWords{0};
         float mRelocScore{0};
 
+        int iFrameID{-1};
+        DBoW2::BowVector mAuxBowVec; // BoW vector calculated via 5th levels up of vocabulary tree
+
     protected:
         // original frame, shared_ptr so that we can get ownership from reference
         std::unique_ptr<Frame> pFrame{nullptr};

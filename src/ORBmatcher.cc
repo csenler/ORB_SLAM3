@@ -2393,6 +2393,132 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
+    int ORBmatcher::SearchByProjection(Frame &CurrentFrame, Frame *pF, const float th, const int ORBdist)
+    {
+        int nmatches = 0;
+
+        const Sophus::SE3f Tcw = CurrentFrame.GetPose();
+        Eigen::Vector3f Ow = Tcw.inverse().translation();
+
+        // Rotation Histogram (to check rotation consistency)
+        vector<int> rotHist[HISTO_LENGTH];
+        for (int i = 0; i < HISTO_LENGTH; i++)
+            rotHist[i].reserve(500);
+        const float factor = 1.0f / HISTO_LENGTH;
+
+        const vector<MapPoint *> vpMPs = pF->GetMapPoints();
+
+        for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
+        {
+            MapPoint *pMP = vpMPs[i];
+
+            if (pMP)
+            {
+                if (!pMP->isBad())
+                {
+                    // Project
+                    Eigen::Vector3f x3Dw = pMP->GetWorldPos();
+                    Eigen::Vector3f x3Dc = Tcw * x3Dw;
+
+                    const Eigen::Vector2f uv = CurrentFrame.mpCamera->project(x3Dc);
+
+                    if (uv(0) < CurrentFrame.mnMinX || uv(0) > CurrentFrame.mnMaxX)
+                        continue;
+                    if (uv(1) < CurrentFrame.mnMinY || uv(1) > CurrentFrame.mnMaxY)
+                        continue;
+
+                    // Compute predicted scale level
+                    Eigen::Vector3f PO = x3Dw - Ow;
+                    float dist3D = PO.norm();
+
+                    const float maxDistance = pMP->GetMaxDistanceInvariance();
+                    const float minDistance = pMP->GetMinDistanceInvariance();
+
+                    // Depth must be inside the scale pyramid of the image
+                    if (dist3D < minDistance || dist3D > maxDistance)
+                        continue;
+
+                    int nPredictedLevel = pMP->PredictScale(dist3D, &CurrentFrame);
+
+                    // Search in a window
+                    const float radius = th * CurrentFrame.mvScaleFactors[nPredictedLevel];
+
+                    const vector<size_t> vIndices2 = CurrentFrame.GetFeaturesInArea(uv(0), uv(1), radius, nPredictedLevel - 1, nPredictedLevel + 1);
+
+                    if (vIndices2.empty())
+                        continue;
+
+                    const cv::Mat dMP = pMP->GetDescriptor();
+
+                    int bestDist = 256;
+                    int bestIdx2 = -1;
+
+                    for (vector<size_t>::const_iterator vit = vIndices2.begin(); vit != vIndices2.end(); vit++)
+                    {
+                        const size_t i2 = *vit;
+                        if (CurrentFrame.mvpMapPoints[i2])
+                            continue;
+
+                        const cv::Mat &d = CurrentFrame.mDescriptors.row(i2);
+
+                        const int dist = DescriptorDistance(dMP, d);
+
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestIdx2 = i2;
+                        }
+                    }
+
+                    if (bestDist <= ORBdist)
+                    {
+                        CurrentFrame.mvpMapPoints[bestIdx2] = pMP;
+                        nmatches++;
+
+                        if (mbCheckOrientation)
+                        {
+                            float rot = pF->mvKeysUn[i].angle - CurrentFrame.mvKeysUn[bestIdx2].angle;
+                            if (rot < 0.0)
+                                rot += 360.0f;
+                            int bin = round(rot * factor);
+                            if (bin == HISTO_LENGTH)
+                                bin = 0;
+                            assert(bin >= 0 && bin < HISTO_LENGTH);
+
+                            // // calculate bin index
+                            // int bin = calculateHistBinIndexFromRotation(rot);
+
+                            rotHist[bin].push_back(bestIdx2);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (mbCheckOrientation)
+        {
+            int ind1 = -1;
+            int ind2 = -1;
+            int ind3 = -1;
+
+            ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+
+            for (int i = 0; i < HISTO_LENGTH; i++)
+            {
+                if (i != ind1 && i != ind2 && i != ind3)
+                {
+                    for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+                    {
+                        CurrentFrame.mvpMapPoints[rotHist[i][j]] = NULL;
+                        nmatches--;
+                    }
+                }
+            }
+        }
+
+        return nmatches;
+    }
+
     void ORBmatcher::ComputeThreeMaxima(vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
     {
         int max1 = 0;

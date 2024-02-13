@@ -7,7 +7,9 @@ namespace ORB_SLAM3
         pVoc = std::make_shared<ORBVocabulary>(voc);
         vInvertedFile.resize(voc.size());
 
-        AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * voc.size();
+        // AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * voc.size();
+
+        // lLastIvertedFileIndices.setOverflowCallback(std::bind(&AuxiliaryFrameDatabase::circularListOverflowCallback, this, std::placeholders::_1));
     }
 
     void AuxiliaryFrameDatabase::SetORBVocabulary(ORBVocabulary *pORBVoc)
@@ -16,17 +18,18 @@ namespace ORB_SLAM3
         vInvertedFile.clear();
         vInvertedFile.resize(pVoc->size());
 
-        AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * pVoc->size();
+        // AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * pVoc->size();
     }
 
-    int AuxiliaryFrameDatabase::getTotalFrameSize() const
+    unsigned long long AuxiliaryFrameDatabase::getTotalFrameSize() const
     {
-        int nSize = 0;
-        for (const auto &l : vInvertedFile)
-        {
-            nSize += l.size();
-        }
-        return nSize;
+        // int nSize = 0;
+        // for (const auto &l : vInvertedFile)
+        // {
+        //     nSize += l.size();
+        // }
+        // return nSize;
+        return ullTotalFramesInDb;
     }
 
     bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const Frame &refFrame)
@@ -59,38 +62,88 @@ namespace ORB_SLAM3
         {
             // save the last frame that has been added to the database
             ptrLastFrame = std::make_shared<AuxiliaryFrame>(refFrame); // need to use std::move here?
+            ptrLastFrame->iFrameID = iAuxFrameID++;
+            std::cout << "AuxiliaryFrameDatabase::add -> owned frame with id : " << refFrame.mnId << std::endl;
 
-            for (auto vit = refFrame.mBowVec.begin(), vend = refFrame.mBowVec.end(); vit != vend; vit++)
+            // // calculate 5th level up BoW vector
+            // ptrLastFrame->mAuxBowVec = computeAuxiliaryBoW(ptrLastFrame->GetFrame(), 5);
+
+            for (auto vit = refFrame.mBowVec.begin(), vend = refFrame.mBowVec.end(); vit != vend; vit++) // default 4 level up of voc tree
+            // for (auto vit = ptrLastFrame->mAuxBowVec.begin(), vend = ptrLastFrame->mAuxBowVec.end(); vit != vend; vit++) // 5th levelup of voc tree
             {
                 vInvertedFile[vit->first].push_back(ptrLastFrame);
+                ullTotalFramesInDb++;
+                // lLastIvertedFileIndices.push_back(vit->first); // save the indices of the inverted file list for later truncation
 
-                // check for truncation
-                if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
-                {
-                    std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
-                    vInvertedFile[vit->first].front().reset(); // release the memory
-                    vInvertedFile[vit->first].pop_front();
-                }
+                // // check for truncation
+                // if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
+                // {
+                //     std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
+                //     vInvertedFile[vit->first].front().reset(); // release the memory
+                //     vInvertedFile[vit->first].pop_front();
+                // }
             }
-
-            // truncate if needed
-            // truncateDatabase();
+            std::cout << "AuxiliaryFrameDatabase::add -> truncating db..." << std::endl;
+            // truncate first if necessary
+            truncateDatabase();
+            std::cout << "AuxiliaryFrameDatabase::add -> db truncated, adding to list with aux frame id: " << std::to_string(ptrLastFrame->iFrameID) << " frame mnId: " << std::to_string(ptrLastFrame->GetFrame()->mnId) << std::endl;
+            // add to list
+            lLastIvertedFileIndices.push_back(ptrLastFrame);
         }
+        std::cout << "AuxiliaryFrameDatabase::add -> FIN." << std::endl;
     }
 
-    void AuxiliaryFrameDatabase::truncateDatabase()
+    // void AuxiliaryFrameDatabase::circularListOverflowCallback(AuxiliaryFrame *&pAuxFrame) // TODO: fix ref-of-pointer bullshit here
+    // {
+    //     // traverse vector and remove corresponding entries from inverted file list in order to truncate
+    //     for (auto vit = pAuxFrame->GetFrame()->mBowVec.begin(), vend = pAuxFrame->GetFrame()->mBowVec.end(); vit != vend; vit++)
+    //     {
+    //         vInvertedFile[vit->first].front().reset();
+    //         vInvertedFile[vit->first].pop_front();
+    //     }
+    // }
+
+    void AuxiliaryFrameDatabase::truncateDatabase() // this is not needed since new container class is circular
     {
-        // if database size is bigger than a threshold value, then truncate the database by removing oldest elements
-        if (getTotalFrameSize() > AUX_DB_CAPACITY_TOTAL)
+        // // if database size is bigger than a threshold value, then truncate the database
+        // while (lLastIvertedFileIndices.size() > AUX_DB_CAPACITY_TOTAL)
+        // {
+        //     vInvertedFile[lLastIvertedFileIndices.front()].front().reset(); // release the memory
+        //     vInvertedFile[lLastIvertedFileIndices.front()].pop_front();
+        //     lLastIvertedFileIndices.pop_front();
+        // }
+
+        // truncate using the saved pFrameToTruncate
+        if (lLastIvertedFileIndices.isFull() && !lLastIvertedFileIndices.empty())
         {
-            for (auto &l : vInvertedFile)
+            std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> total frames BEFORE truncate: " << std::to_string(ullTotalFramesInDb) << std::endl;
+            auto pFrameToTruncate = lLastIvertedFileIndices.front();
+            std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> front ref received!" << std::endl;
+            if (pFrameToTruncate && pFrameToTruncate->GetFrame())
             {
-                while (l.size() > AUX_DB_CAPACITY_PER_WORD)
+                std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> entering truncation loop, bow vec size: " << std::to_string(pFrameToTruncate->GetFrame()->mBowVec.size()) << std::endl;
+                for (auto vit = pFrameToTruncate->GetFrame()->mBowVec.begin(), vend = pFrameToTruncate->GetFrame()->mBowVec.end(); vit != vend; vit++)
                 {
-                    l.pop_front();
+                    if (!vInvertedFile[vit->first].empty())
+                    {
+                        vInvertedFile[vit->first].front().reset();
+                        vInvertedFile[vit->first].pop_front();
+                        ullTotalFramesInDb--;
+                    }
                 }
             }
+            else
+            {
+                std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> pFrameToTruncate is nullptr!" << std::endl;
+            }
+            std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> total frames AFTER truncate: " << std::to_string(ullTotalFramesInDb) << std::endl;
+            // now pop from list
+            std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> popping from list with aux frame id: " << std::to_string(pFrameToTruncate->iFrameID) << " Frame mnId: " << std::to_string(pFrameToTruncate->GetFrame()->mnId) << std::endl;
+            lLastIvertedFileIndices.front().reset();
+            lLastIvertedFileIndices.front() = nullptr;
+            lLastIvertedFileIndices.pop_front();
         }
+        std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> FIN." << std::endl;
     }
 
     void AuxiliaryFrameDatabase::clear()
@@ -99,27 +152,27 @@ namespace ORB_SLAM3
         vInvertedFile.resize(pVoc->size());
     }
 
-    DBoW2::BowVector AuxiliaryFrameDatabase::computeAuxiliaryBoW(Frame *pF)
+    DBoW2::BowVector AuxiliaryFrameDatabase::computeAuxiliaryBoW(Frame *pF, int levelsup)
     {
         DBoW2::BowVector vBow;
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(pF->mDescriptors);
-        pVoc->transform(vCurrentDesc, vBow, pF->mFeatVec, 4);
+        pVoc->transform(vCurrentDesc, vBow, pF->mFeatVec, levelsup);
         return vBow;
     }
 
     std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectCandidates(Frame *pF)
     {
-        std::unique_ptr<DBoW2::BowVector> pBowVec = nullptr;
+        if (!pF)
+            return std::vector<AuxiliaryFrame *>();
+
         // TODO: check if vocabulary is same here
         if (pF->mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            pBowVec = std::make_unique<DBoW2::BowVector>(computeAuxiliaryBoW(pF));
+            pF->mBowVec = computeAuxiliaryBoW(pF);
         }
-        else
-        {
-            pBowVec = std::make_unique<DBoW2::BowVector>(pF->mBowVec);
-        }
+
+        const auto pBowVec = &pF->mBowVec;
 
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
@@ -165,7 +218,7 @@ namespace ORB_SLAM3
             if (auxFrame->mnRelocWords > minCommonWords)
             {
                 nscores++;
-                float si = pVoc->score(*(pBowVec.get()), auxFrame->GetFrame()->mBowVec);
+                float si = pVoc->score(*pBowVec, auxFrame->GetFrame()->mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -194,17 +247,21 @@ namespace ORB_SLAM3
     // use only candidatesNum number of candidates
     std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNCandidates(Frame *pF, int candidatesNum)
     {
-        std::unique_ptr<DBoW2::BowVector> pBowVec = nullptr;
+        if (!pF)
+            return std::vector<AuxiliaryFrame *>();
+
         // TODO: check if vocabulary is same here
         if (pF->mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            pBowVec = std::make_unique<DBoW2::BowVector>(computeAuxiliaryBoW(pF));
+            pF->mBowVec = computeAuxiliaryBoW(pF);
         }
-        else
-        {
-            pBowVec = std::make_unique<DBoW2::BowVector>(pF->mBowVec);
-        }
+
+        const auto pBowVec = &pF->mBowVec; // default 4 levelup of voc tree
+
+        // // compute 5th level up BoW vector and use it for comparison
+        // const auto vBow5thLevelUp = computeAuxiliaryBoW(pF, 5); // 5th levelup of voc tree
+        // const auto pBowVec = &vBow5thLevelUp;
 
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
@@ -266,7 +323,7 @@ namespace ORB_SLAM3
             if (auxFrame->mnRelocWords > minCommonWords)
             {
                 nscores++;
-                float si = pVoc->score(*(pBowVec.get()), auxFrame->GetFrame()->mBowVec);
+                float si = pVoc->score(*pBowVec, auxFrame->GetFrame()->mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -292,88 +349,59 @@ namespace ORB_SLAM3
         return vAuxFrames;
     }
 
-    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNBestCandidates(Frame *pF, int candidatesNum) // TODO
+    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNBestCandidates(Frame *pF, int candidatesNum) // TODO: test
     {
-        // Same as DetectCandidates, except we will be using a priority queue to store the best candidates
-        std::priority_queue<AuxiliaryFrame *> pqBestCandidates;
+        // Same as DetectCandidates, except we will be using a comparator to sort candidates with respect to their scores
+        if (!pF)
+            return std::vector<AuxiliaryFrame *>();
 
-        std::unique_ptr<DBoW2::BowVector> pBowVec = nullptr;
+        // construct std::set using the comparator
+        std::set<std::pair<AuxiliaryFrame *, float>, CompareScore> sortedCandidates;
+
         // TODO: check if vocabulary is same here
         if (pF->mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            pBowVec = std::make_unique<DBoW2::BowVector>(computeAuxiliaryBoW(pF));
-        }
-        else
-        {
-            pBowVec = std::make_unique<DBoW2::BowVector>(pF->mBowVec);
+            pF->mBowVec = computeAuxiliaryBoW(pF);
         }
 
-        list<AuxiliaryFrame *> lFramesSharingWords;
-        // find all frames sharing words with the query
-        for (auto vit = pBowVec->begin(), vend = pBowVec->end(); vit != vend; vit++)
+        const auto pBowVec = &pF->mBowVec;
+
+        // std::cout << "AuxiliaryFrameDatabase::DetectNBestCandidates -> lLastIvertedFileIndices size : " << lLastIvertedFileIndices.getSize() << std::endl;
+
+        const int iIterLimit = candidatesNum * 2;
+        int iIterCount = 0;
+
+        for (const auto &auxFrameIndex : lLastIvertedFileIndices)
         {
-            for (auto &auxFrame : vInvertedFile[vit->first])
+            if (iIterCount == iIterLimit)
+                break;
+
+            // compute score for each frame in db and add to priority queue
+            if (auxFrameIndex)
             {
-                if (auxFrame->mnRelocQuery != pF->mnId)
-                {
-                    auxFrame->mnRelocWords = 0;
-                    auxFrame->mnRelocQuery = pF->mnId;
-                    lFramesSharingWords.push_back(auxFrame.get());
-                }
-                auxFrame->mnRelocWords++;
+                auto score = pVoc->score(*pBowVec, auxFrameIndex->GetFrame()->mBowVec);
+                // std::cout << "AuxiliaryFrameDatabase::DetectNBestCandidates -> score : " << score << " between " << pF->mnId << " and " << auxFrameIndex->GetFrame()->mnId << std::endl;
+                sortedCandidates.insert(std::make_pair(auxFrameIndex.get(), score));
             }
+            // else
+            // {
+            //     std::cout << "AuxiliaryFrameDatabase::DetectNBestCandidates -> auxFrameIndex is nullptr!" << std::endl;
+            // }
+            iIterCount++;
         }
 
-        if (lFramesSharingWords.empty())
-        {
-            return std::vector<AuxiliaryFrame *>();
-        }
-
-        // Only compare against those keyframes that share enough words
-        int maxCommonWords = 0;
-        for (const auto auxFrame : lFramesSharingWords)
-        {
-            if (auxFrame->mnRelocWords > maxCommonWords)
-            {
-                maxCommonWords = auxFrame->mnRelocWords;
-            }
-        }
-
-        int minCommonWords = maxCommonWords * 0.8f;
-
-        list<pair<float, AuxiliaryFrame *>> lScoreAndMatch;
-
-        int nscores = 0;
-
-        // Compute similarity and best score
-        float bestAccScore = 0;
-        for (const auto auxFrame : lFramesSharingWords)
-        {
-            if (auxFrame->mnRelocWords > minCommonWords)
-            {
-                nscores++;
-                float si = pVoc->score(*(pBowVec.get()), auxFrame->GetFrame()->mBowVec);
-                if (si > bestAccScore)
-                {
-                    bestAccScore = si;
-                }
-                lScoreAndMatch.push_back(make_pair(si, auxFrame));
-            }
-        }
-
-        if (lScoreAndMatch.empty())
+        if (sortedCandidates.empty())
             return std::vector<AuxiliaryFrame *>();
 
-        // return those that are within the 80% of the best score
+        // return first N candidates with highest score
         std::vector<AuxiliaryFrame *> vAuxFrames;
-        vAuxFrames.reserve(lScoreAndMatch.size());
-        for (const auto &scoreAndMatch : lScoreAndMatch)
+        vAuxFrames.reserve(candidatesNum);
+        for (const auto &candidate : sortedCandidates)
         {
-            if (scoreAndMatch.first > 0.8f * bestAccScore)
-            {
-                vAuxFrames.push_back(scoreAndMatch.second);
-            }
+            vAuxFrames.push_back(candidate.first);
+            if (vAuxFrames.size() == candidatesNum)
+                break;
         }
 
         return vAuxFrames;
