@@ -19,14 +19,19 @@ namespace ORB_SLAM3
 
         AuxiliaryFrame() : pFrame(nullptr) {}
 
-        AuxiliaryFrame(const Frame &frame)
+        AuxiliaryFrame(Frame &frame)
         {
-            pFrame = std::make_unique<Frame>(Frame(frame));
+            pFrame = std::make_unique<Frame>(frame);
         }
 
-        Frame *GetFrame() const
+        bool isInternalFrameValid() const
         {
-            return pFrame.get();
+            return (pFrame != nullptr && pFrame.get() != nullptr);
+        }
+
+        Frame &GetFrame() const
+        {
+            return *(pFrame.get());
         }
 
         // Variables used by the keyframe database during relocalization
@@ -38,7 +43,7 @@ namespace ORB_SLAM3
         DBoW2::BowVector mAuxBowVec; // BoW vector calculated via 5th levels up of vocabulary tree
 
     protected:
-        // original frame, shared_ptr so that we can get ownership from reference
+        // original frame, get ownership since it is local
         std::unique_ptr<Frame> pFrame{nullptr};
     };
 

@@ -1687,8 +1687,14 @@ namespace ORB_SLAM3
 
         const auto retPose = mCurrentFrame.GetPose(); // save pose to return later
 
-        // pass frame to external storage if it was Tracked, this should only be active in "Load" mode
-        if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK)
+        // calculate this before MP cleanup -> MP size and KeyPoints sizes are same due to initial allocation, after mappoint cleanup there will be nullptrs, calculate statistics beforehand just in case
+        CalculateMatchCountsForStatistics(mCurrentFrame);
+
+        // clean map points -> this is in order to prevent memory leaks due to MapPoint pointers that was detected via AddressSanitizer
+        // DoMapPointCleanup(); // TODO: this is BUGGY, also may need mutex for slam mode due to other threads ??? -> when enabled, active MapPoint->EraseMapPoint as well
+
+        // pass frame to external storage if it was Tracked, this should only be active in "Load" mode, also only in localization-only mode
+        if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK && mbOnlyTracking)
         {
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (before add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
             ptrAuxiliaryFrameStorage->addFrameToStorage(mCurrentFrame);
@@ -1696,6 +1702,68 @@ namespace ORB_SLAM3
         }
 
         return retPose;
+    }
+
+    void Tracking::DoMapPointCleanup()
+    {
+        // mappoint cleanup for current map TODO: clean from currentFrame as well before adding to auxiliary storage???
+        Verbose::PrintMess("Cleaning map points", Verbose::VERBOSITY_NORMAL);
+        // first, clean mappoints from current and last frame
+        auto mspMapPointsToBeRemoved = mpAtlas->GetCurrentMap()->getMapPointsToDelete();
+        int iDeletedMapPointsInCurrentFrame = 0;
+        for (auto pMP : mspMapPointsToBeRemoved) // this should be for MPs belonging to current and last frame
+        {
+            if (pMP)
+            {
+                for (auto i = 0; i < mCurrentFrame.mvpMapPoints.size(); i++)
+                {
+                    auto pFrameMP = mCurrentFrame.mvpMapPoints[i];
+                    if (pFrameMP && pMP == pFrameMP)
+                    {
+                        // clean for currentFrame and mark as outlier just in case
+                        mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+                        mCurrentFrame.mvbOutlier[i] = true;
+
+                        // should also be cleaned at mLastFrame, which would become mCurrentFrame after Track()
+                        mLastFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+                        mLastFrame.mvbOutlier[i] = true;
+
+                        iDeletedMapPointsInCurrentFrame++;
+                    }
+                }
+            }
+        }
+        Verbose::PrintMess("Cleaned map points count in current frame : " + std::to_string(iDeletedMapPointsInCurrentFrame), Verbose::VERBOSITY_NORMAL);
+        // then, clean mappoints from current map & associated keyframes
+        const int iNumOfDeletedMPs = mpAtlas->GetCurrentMap()->checkAndDeleteMapPoints();
+        Verbose::PrintMess("Cleaned map points count : " + std::to_string(iNumOfDeletedMPs), Verbose::VERBOSITY_NORMAL);
+    }
+
+    void Tracking::CalculateMatchCountsForStatistics(const Frame &mCurrentFrame)
+    {
+        // calculate match counts
+        int iMapPointMatchCount = 0;
+        int iVisualOdometryMatchCount = 0;
+        const auto &vCurrentFrameKeyPoints = mCurrentFrame.mvKeys;
+        const auto &vCurrentFrameMapPoints = mCurrentFrame.mvpMapPoints;
+        const auto &vCurrentFrameOutliers = mCurrentFrame.mvbOutlier;
+        for (int i = 0; i < vCurrentFrameKeyPoints.size(); i++)
+        {
+            ORB_SLAM3::MapPoint *pMP = vCurrentFrameMapPoints[i];
+            if (pMP)
+            {
+                if (!vCurrentFrameOutliers[i])
+                {
+                    if (pMP->Observations() > 0)
+                        iMapPointMatchCount++;
+                    else
+                        iVisualOdometryMatchCount++;
+                }
+            }
+        }
+
+        sTrackStats.iNumOfMatchedMapPoints = iMapPointMatchCount;
+        sTrackStats.iNumOfVisualOdomPoints = iVisualOdometryMatchCount;
     }
 
     void Tracking::GrabImuData(const IMU::Point &imuMeasurement)
@@ -4040,6 +4108,16 @@ namespace ORB_SLAM3
 
         sTrackStats.vRelocStats.back().iRelocalizaionElapsedTimeMs = tElapsedTime;
 
+        // cleanup
+        for (auto it = vpMLPnPsolvers.begin(); it != vpMLPnPsolvers.end(); it++)
+        {
+            if (*it)
+            {
+                delete *it;
+                *it = nullptr;
+            }
+        }
+
         if (!bMatch)
         {
             sTrackStats.vRelocStats.back().bRelocSuccess = false;
@@ -4074,7 +4152,7 @@ namespace ORB_SLAM3
         const auto ptrAuxDB = ptrAuxiliaryFrameStorage->GetAuxFrameDB();
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> current aux db frame size: " + std::to_string(ptrAuxDB->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
         // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
-        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(&mCurrentFrame, 30);
+        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(mCurrentFrame, 30);
         // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNBestCandidates(&mCurrentFrame, 30); // NOTE: worse performance than DetectNCandidates, very few inliers if any
 
         if (vCandidateAuxiliaryFrames.empty())
@@ -4103,9 +4181,9 @@ namespace ORB_SLAM3
 
         for (int i = 0; i < nKFs; i++)
         {
-            Frame *pAF = vCandidateAuxiliaryFrames[i]->GetFrame();
+            Frame &refFrame = vCandidateAuxiliaryFrames[i]->GetFrame();
 
-            int nmatches = matcher.SearchByBoW(pAF, mCurrentFrame, vvpMapPointMatches[i]);
+            int nmatches = matcher.SearchByBoW(refFrame, mCurrentFrame, vvpMapPointMatches[i]);
             Verbose::PrintMess("RelocalizationViaExternalBuffer -> nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
             if (nmatches < 10) // default 15
@@ -4258,6 +4336,16 @@ namespace ORB_SLAM3
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> elapsed time (ms): " + std::to_string(tElapsedTime), Verbose::VERBOSITY_NORMAL);
 
         sTrackStats.vRelocStats.back().iRelocWithExtBufElapsedTimeMs = tElapsedTime;
+
+        // cleanup
+        for (auto it = vpMLPnPsolvers.begin(); it != vpMLPnPsolvers.end(); it++)
+        {
+            if (*it)
+            {
+                delete *it;
+                *it = nullptr;
+            }
+        }
 
         if (!bMatch)
         {

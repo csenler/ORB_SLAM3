@@ -52,13 +52,20 @@ namespace ORB_SLAM3
         for (size_t iMP = 0; iMP < vpMapPoints.size(); iMP++)
         {
             MapPoint *pMP = vpMapPoints[iMP];
+
+            if (!pMP || pMP->isBad())
+                continue;
+
             if (!pMP->mbTrackInView && !pMP->mbTrackInViewR)
                 continue;
 
             if (bFarPoints && pMP->mTrackDepth > thFarPoints)
                 continue;
 
-            if (pMP->isBad())
+            // if (pMP->isBad())
+            //     continue;
+
+            if (pMP->mnTrackScaleLevel < 0) // this causes segfault later when used as index
                 continue;
 
             if (pMP->mbTrackInView)
@@ -439,13 +446,13 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
-    int ORBmatcher::SearchByBoW(Frame *pF, Frame &F, vector<MapPoint *> &vpMapPointMatches)
+    int ORBmatcher::SearchByBoW(const Frame &refFrame, Frame &F, vector<MapPoint *> &vpMapPointMatches)
     {
-        const vector<MapPoint *> vpMapPointsKF = pF->GetMapPoints();
+        const vector<MapPoint *> vpMapPointsKF = refFrame.GetMapPoints();
 
         vpMapPointMatches = vector<MapPoint *>(F.N, static_cast<MapPoint *>(NULL));
 
-        const DBoW2::FeatureVector &vFeatVecKF = pF->mFeatVec; // this should exists, need to check?
+        const DBoW2::FeatureVector &vFeatVecKF = refFrame.mFeatVec; // this should exists, need to check?
 
         int nmatches = 0;
 
@@ -479,7 +486,7 @@ namespace ORB_SLAM3
                     if (pMP->isBad())
                         continue;
 
-                    const cv::Mat &dKF = pF->mDescriptors.row(realIdxKF);
+                    const cv::Mat &dKF = refFrame.mDescriptors.row(realIdxKF);
 
                     int bestDist1 = 256;
                     int bestIdxF = -1;
@@ -554,13 +561,13 @@ namespace ORB_SLAM3
                         {
                             vpMapPointMatches[bestIdxF] = pMP;
 
-                            const cv::KeyPoint &kp = pF->mvKeysUn[realIdxKF];
+                            const cv::KeyPoint &kp = refFrame.mvKeysUn[realIdxKF];
 
                             if (mbCheckOrientation)
                             {
                                 cv::KeyPoint &Fkp =
-                                    (!pF->mpCamera2 || F.Nleft == -1) ? F.mvKeys[bestIdxF] : (bestIdxF >= F.Nleft) ? F.mvKeysRight[bestIdxF - F.Nleft]
-                                                                                                                   : F.mvKeys[bestIdxF];
+                                    (!refFrame.mpCamera2 || F.Nleft == -1) ? F.mvKeys[bestIdxF] : (bestIdxF >= F.Nleft) ? F.mvKeysRight[bestIdxF - F.Nleft]
+                                                                                                                        : F.mvKeys[bestIdxF];
 
                                 float rot = kp.angle - Fkp.angle;
                                 if (rot < 0.0)
@@ -584,7 +591,7 @@ namespace ORB_SLAM3
                             {
                                 vpMapPointMatches[bestIdxFR] = pMP;
 
-                                const cv::KeyPoint &kp = pF->mvKeysUn[realIdxKF];
+                                const cv::KeyPoint &kp = refFrame.mvKeysUn[realIdxKF];
 
                                 if (mbCheckOrientation)
                                 {
@@ -2267,7 +2274,7 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
-    int ORBmatcher::SearchByProjection(Frame &CurrentFrame, Frame *pF, const set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist)
+    int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &refFrame, const set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist)
     {
         int nmatches = 0;
 
@@ -2280,7 +2287,7 @@ namespace ORB_SLAM3
             rotHist[i].reserve(500);
         const float factor = 1.0f / HISTO_LENGTH;
 
-        const vector<MapPoint *> vpMPs = pF->GetMapPoints();
+        const vector<MapPoint *> vpMPs = refFrame.GetMapPoints();
 
         for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
         {
@@ -2351,7 +2358,7 @@ namespace ORB_SLAM3
 
                         if (mbCheckOrientation)
                         {
-                            float rot = pF->mvKeysUn[i].angle - CurrentFrame.mvKeysUn[bestIdx2].angle;
+                            float rot = refFrame.mvKeysUn[i].angle - CurrentFrame.mvKeysUn[bestIdx2].angle;
                             if (rot < 0.0)
                                 rot += 360.0f;
                             int bin = round(rot * factor);
@@ -2393,7 +2400,7 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
-    int ORBmatcher::SearchByProjection(Frame &CurrentFrame, Frame *pF, const float th, const int ORBdist)
+    int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &refFrame, const float th, const int ORBdist)
     {
         int nmatches = 0;
 
@@ -2406,7 +2413,7 @@ namespace ORB_SLAM3
             rotHist[i].reserve(500);
         const float factor = 1.0f / HISTO_LENGTH;
 
-        const vector<MapPoint *> vpMPs = pF->GetMapPoints();
+        const vector<MapPoint *> vpMPs = refFrame.GetMapPoints();
 
         for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
         {
@@ -2477,7 +2484,7 @@ namespace ORB_SLAM3
 
                         if (mbCheckOrientation)
                         {
-                            float rot = pF->mvKeysUn[i].angle - CurrentFrame.mvKeysUn[bestIdx2].angle;
+                            float rot = refFrame.mvKeysUn[i].angle - CurrentFrame.mvKeysUn[bestIdx2].angle;
                             if (rot < 0.0)
                                 rot += 360.0f;
                             int bin = round(rot * factor);

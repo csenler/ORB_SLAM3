@@ -102,6 +102,33 @@ namespace ORB_SLAM3
 
         // TODO: This only erase the pointer.
         // Delete the MapPoint
+
+        // mspMapPointsToDelete.insert(pMP); // save for deletion -> TODO: remember to activate when DoMapPointCleanup at Tracking is fixed.
+    }
+
+    std::set<MapPoint *> Map::getMapPointsToDelete()
+    {
+        unique_lock<mutex> lock(mMutexMap);
+        return mspMapPointsToDelete;
+    }
+
+    int Map::checkAndDeleteMapPoints()
+    {
+        unique_lock<mutex> lock(mMutexMap);
+        const int nMapPoints = mspMapPointsToDelete.size();
+        for (auto mp : mspMapPointsToDelete)
+        {
+            if (mp)
+            {
+                if (!mp->isBad())
+                {
+                    mp->SetBadFlag(); // this should remove it from observing keyframes
+                }
+            }
+            delete mp;
+        }
+        mspMapPointsToDelete.clear();
+        return nMapPoints;
     }
 
     void Map::EraseKeyFrame(KeyFrame *pKF)

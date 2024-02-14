@@ -34,26 +34,26 @@ namespace ORB_SLAM3
         void SetORBVocabulary(ORBVocabulary *pORBVoc);
         unsigned long long getTotalFrameSize() const;
         void truncateDatabase();
-        DBoW2::BowVector computeAuxiliaryBoW(Frame *pF, int levelsup = 4);
+        void computeAuxiliaryBoW(Frame &refFrame, int levelsup = 4);
 
         // compute similarity score between two frames and decide whether to add the frame to the database
         bool shouldBeAddedToDb(const Frame &refFrame);
 
         // DetectCandidates by iterating through the list of frames in the inverted file
-        std::vector<AuxiliaryFrame *> DetectCandidates(Frame *pF);
+        std::vector<AuxiliaryFrame *> DetectCandidates(Frame &refFrame);
         // Detect a given number of candidates to save time
-        std::vector<AuxiliaryFrame *> DetectNCandidates(Frame *pF, int candidatesNum);
+        std::vector<AuxiliaryFrame *> DetectNCandidates(Frame &refFrame, int candidatesNum);
         // Detect Best Candidates to save time
-        std::vector<AuxiliaryFrame *> DetectNBestCandidates(Frame *pF, int candidatesNum); // TODO
+        std::vector<AuxiliaryFrame *> DetectNBestCandidates(Frame &refFrame, int candidatesNum); // TODO
         // DetectCandidates by iterating thrgough reference keyframe of each frame in the inverted file
-        std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame *pF);
+        std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame& refFrame);
 
         // // circular list overflow callbcak
         // void circularListOverflowCallback(AuxiliaryFrame *&refAuxFrame); // ref needs to be constant so compiler knows i wont modify it -_-
 
     protected:
-        inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds = 300 frames
-        inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 1800;
+        // inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds = 300 frames
+        inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 300;
         inline static unsigned long long ullTotalFramesInDb = 0;
         inline static int iAuxFrameID = 0;
 
@@ -61,7 +61,7 @@ namespace ORB_SLAM3
         std::shared_ptr<ORBVocabulary> pVoc{nullptr};
 
         // Inverted file
-        std::vector<std::list<std::shared_ptr<AuxiliaryFrame>>> vInvertedFile;
+        std::vector<std::list<AuxiliaryFrame *>> vInvertedFile;
         // StackBuffer<list<AuxiliaryFrame *>> bufInvertedFile;
 
         CircularList<std::shared_ptr<AuxiliaryFrame>> lLastIvertedFileIndices{AUX_DB_CAPACITY_TOTAL};

@@ -375,6 +375,9 @@ namespace ORB_SLAM3
         // Reset IMU biases and compute frame velocity
         void ResetFrameIMU();
 
+        // mappoint cleanup
+        void DoMapPointCleanup();
+
         bool mbMapUpdated;
 
         // Imu preintegration from last frame
@@ -505,6 +508,8 @@ namespace ORB_SLAM3
 
         Sophus::SE3f getWorldFrameRotation(const int &sensor, const cv::FileStorage &fSettings);
         Sophus::SE3f Tc0w; // world frame rotation matrix
+
+        void CalculateMatchCountsForStatistics(const Frame &mCurrentFrame);
 
 #ifdef REGISTER_LOOP
         bool Stop();

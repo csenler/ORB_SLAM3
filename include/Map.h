@@ -198,6 +198,9 @@ namespace ORB_SLAM3
             strMapUUID = uuid_;
         }
 
+        int checkAndDeleteMapPoints();
+        std::set<MapPoint *> getMapPointsToDelete();
+
     protected:
         long unsigned int mnId;
 
@@ -253,6 +256,9 @@ namespace ORB_SLAM3
         // map uuid
         std::string strMapUUID;
         std::mutex mMutexUUID;
+
+        // for cleanup
+        std::set<MapPoint *> mspMapPointsToDelete;
     };
 
 } // namespace ORB_SLAM3
