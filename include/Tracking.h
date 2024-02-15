@@ -230,6 +230,12 @@ namespace ORB_SLAM3
                 // iTrackViaMotionMatchResult = 0;
                 // iTrackViaReferenceKeyFrameMatchResult = 0;
                 bVisualOdomFlag = false;
+                bVelocityFlag = false;
+                iNumOfKeyFrames = 0;
+                iNumOfMapPoints = 0;
+                bIsLoadedMap = false;
+                iCurrentMapID = -1;
+                iAuxiliaryDbAddElapedTimeMs = 0;
 
                 vRelocStats.clear();
             }
@@ -278,6 +284,8 @@ namespace ORB_SLAM3
                     vAdditionalMatchesAfterPoseOptimization.clear();
                     vNumOfResultantGoodInliers.clear();
                     bRelocSuccess = false;
+                    iRelocalizaionElapsedTimeMs = 0;
+                    iRelocWithExtBufElapsedTimeMs = 0;
                 }
 
                 void reserveVectors(const int &size_)
@@ -316,6 +324,9 @@ namespace ORB_SLAM3
 
             std::vector<RelocStats> vRelocStats;
 
+            // elapsed time
+            int iAuxiliaryDbAddElapedTimeMs{0};
+
         } sTrackStats;
 
         cv::Mat getCurrentViewerFrame() const;
@@ -335,6 +346,14 @@ namespace ORB_SLAM3
         void setDisableAuxiliaryFrameDB(const bool &bDisableAuxiliaryDB_)
         {
             bDisableAuxiliaryDB.store(bDisableAuxiliaryDB_);
+        }
+
+        void setAuxiliaryFrameDatabaseVocTreeLevelsUp(const uint &iVocTreeLevelsUp_)
+        {
+            if (ptrAuxiliaryFrameStorage)
+            {
+                ptrAuxiliaryFrameStorage->setVocTreeLevelsUp(iVocTreeLevelsUp_);
+            }
         }
 
     protected:
@@ -563,6 +582,11 @@ namespace ORB_SLAM3
             {
                 ptrORBVocabulary = ptrVoc;
                 auxFrameDB.SetORBVocabulary(ptrORBVocabulary);
+            }
+
+            void setVocTreeLevelsUp(const uint &levelsup)
+            {
+                auxFrameDB.setVocTreeLevelsUp(levelsup);
             }
 
             AuxiliaryFrameDatabase *GetAuxFrameDB()

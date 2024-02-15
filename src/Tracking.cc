@@ -1696,9 +1696,14 @@ namespace ORB_SLAM3
         // pass frame to external storage if it was Tracked, this should only be active in "Load" mode, also only in localization-only mode
         if (ptrAuxiliaryFrameStorage && mState == eTrackingState::OK && mbOnlyTracking)
         {
+            const auto timeRef = std::chrono::high_resolution_clock::now();
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (before add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
             ptrAuxiliaryFrameStorage->addFrameToStorage(mCurrentFrame);
             Verbose::PrintMess("GrabImageMonoular -> aux db frame size (after add): " + std::to_string(ptrAuxiliaryFrameStorage->GetAuxFrameDB()->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
+            const auto timeNow = std::chrono::high_resolution_clock::now();
+            const auto elapsed_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
+            Verbose::PrintMess("GrabImageMonoular -> aux db frame add elapsed time (ms): " + std::to_string(elapsed_time_ms), Verbose::VERBOSITY_NORMAL);
+            sTrackStats.iAuxiliaryDbAddElapedTimeMs = elapsed_time_ms;
         }
 
         return retPose;
@@ -4145,7 +4150,8 @@ namespace ORB_SLAM3
 
         Verbose::PrintMess("Starting RelocalizationViaExternalBuffer", Verbose::VERBOSITY_NORMAL);
         // Compute Bag of Words Vector
-        mCurrentFrame.ComputeBoW();
+        if (mCurrentFrame.mBowVec.empty())
+            mCurrentFrame.ComputeBoW();
 
         // Relocalization is performed when tracking is lost
         // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
@@ -4181,9 +4187,14 @@ namespace ORB_SLAM3
 
         for (int i = 0; i < nKFs; i++)
         {
-            Frame &refFrame = vCandidateAuxiliaryFrames[i]->GetFrame();
+            const auto &refAuxFrame = *vCandidateAuxiliaryFrames[i];
+            int nmatches = 0;
 
-            int nmatches = matcher.SearchByBoW(refFrame, mCurrentFrame, vvpMapPointMatches[i]);
+            if (!ptrAuxDB->isAuxiliaryBoWAndFeatVecsInUse())
+                nmatches = matcher.SearchByBoW(refAuxFrame.GetFrame(), mCurrentFrame, vvpMapPointMatches[i]);
+            else
+                nmatches = matcher.SearchByBoW(refAuxFrame, mCurrentFrame, vvpMapPointMatches[i]);
+
             Verbose::PrintMess("RelocalizationViaExternalBuffer -> nmatches : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
             if (nmatches < 10) // default 15
@@ -4194,7 +4205,7 @@ namespace ORB_SLAM3
             else
             {
                 MLPnPsolver *pSolver = new MLPnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
-                pSolver->SetRansacParameters(0.99, 10, 300, 6, 0.5, 5.991); // This solver needs at least 6 points
+                pSolver->SetRansacParameters(0.99, 8, 300, 6, 0.5, 5.991); // This solver needs at least 6 points
                 vpMLPnPsolvers[i] = pSolver;
                 nCandidates++;
             }

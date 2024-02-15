@@ -21,6 +21,16 @@ namespace ORB_SLAM3
         // AUX_DB_CAPACITY_TOTAL = AUX_DB_CAPACITY_PER_WORD * pVoc->size();
     }
 
+    void AuxiliaryFrameDatabase::setVocTreeLevelsUp(const uint &levelsup)
+    {
+        iVocTreeLevelsUp = levelsup;
+        // if changed from default, set a flag so that auxiliary BoW vectors are recalculated
+        if (iVocTreeLevelsUp != 4)
+        {
+            bUseAuxiliaryFrameBoW = true;
+        }
+    }
+
     unsigned long long AuxiliaryFrameDatabase::getTotalFrameSize() const
     {
         // int nSize = 0;
@@ -32,7 +42,7 @@ namespace ORB_SLAM3
         return ullTotalFramesInDb;
     }
 
-    bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const Frame &refFrame)
+    bool AuxiliaryFrameDatabase::shouldBeAddedToDb(const Frame &refFrame) // TODO: if iVocTreeLevelsUp is used, should use that levelup for comparison ???
     {
         if (!ptrLastFrame || !ptrLastFrame->isInternalFrameValid())
             return true; // initial case or dont check last frame
@@ -58,30 +68,27 @@ namespace ORB_SLAM3
             pVoc->transform(vCurrentDesc, refFrame.mBowVec, refFrame.mFeatVec, 4);
         }
 
-        if (shouldBeAddedToDb(refFrame)) // TODO: test this
+        if (shouldBeAddedToDb(refFrame))
         {
             // save the last frame that has been added to the database
             ptrLastFrame = std::make_shared<AuxiliaryFrame>(refFrame); // need to use std::move here?
             ptrLastFrame->iFrameID = iAuxFrameID++;
             std::cout << "AuxiliaryFrameDatabase::add -> owned frame with id : " << refFrame.mnId << std::endl;
 
-            // // calculate 5th level up BoW vector
-            // ptrLastFrame->mAuxBowVec = computeAuxiliaryBoW(ptrLastFrame->GetFrame(), 5);
+            DBoW2::BowVector *ptrBowVec = nullptr;
+            ptrBowVec = &ptrLastFrame->GetFrame().mBowVec;
 
-            for (auto vit = refFrame.mBowVec.begin(), vend = refFrame.mBowVec.end(); vit != vend; vit++) // default 4 level up of voc tree
-            // for (auto vit = ptrLastFrame->mAuxBowVec.begin(), vend = ptrLastFrame->mAuxBowVec.end(); vit != vend; vit++) // 5th levelup of voc tree
+            // calculate 5th level up BoW vector
+            if (bUseAuxiliaryFrameBoW)
+            {
+                computeAuxiliaryFrameBoW(*ptrLastFrame, iVocTreeLevelsUp);
+                ptrBowVec = &ptrLastFrame->mBoWAndFeatureVecs.mAuxBowVec;
+            }
+
+            for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++) // default 4 level up of voc tree
             {
                 vInvertedFile[vit->first].push_back(ptrLastFrame.get());
                 ullTotalFramesInDb++;
-                // lLastIvertedFileIndices.push_back(vit->first); // save the indices of the inverted file list for later truncation
-
-                // // check for truncation
-                // if (vInvertedFile[vit->first].size() > AUX_DB_CAPACITY_PER_WORD)
-                // {
-                //     std::cout << "AuxiliaryFrameDatabase::add -> AUX_DB_CAPACITY_PER_WORD is exceeded, truncating the database for word idx : " << vit->first << std::endl;
-                //     vInvertedFile[vit->first].front().reset(); // release the memory
-                //     vInvertedFile[vit->first].pop_front();
-                // }
             }
             std::cout << "AuxiliaryFrameDatabase::add -> truncating db..." << std::endl;
             // truncate first if necessary
@@ -105,6 +112,7 @@ namespace ORB_SLAM3
 
     void AuxiliaryFrameDatabase::truncateDatabase() // this is not needed since new container class is circular
     {
+        const auto timeRef = std::chrono::high_resolution_clock::now();
         // // if database size is bigger than a threshold value, then truncate the database
         // while (lLastIvertedFileIndices.size() > AUX_DB_CAPACITY_TOTAL)
         // {
@@ -178,6 +186,9 @@ namespace ORB_SLAM3
             // lLastIvertedFileIndices.pop_front();
             std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> total frames AFTER truncate: " << std::to_string(ullTotalFramesInDb) << std::endl;
         }
+        const auto timeNow = std::chrono::high_resolution_clock::now();
+        const auto elapsed_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
+        std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> truncate elapsed time (ms) : " << std::to_string(elapsed_time_ms) << std::endl;
         std::cout << "AuxiliaryFrameDatabase::truncateDatabase -> FIN." << std::endl;
     }
 
@@ -187,11 +198,30 @@ namespace ORB_SLAM3
         vInvertedFile.resize(pVoc->size());
     }
 
-    void AuxiliaryFrameDatabase::computeAuxiliaryBoW(Frame &refFrame, int levelsup)
+    void AuxiliaryFrameDatabase::computeFrameBoW(Frame &refFrame, int levelsup)
     {
         refFrame.mBowVec.clear(); // just in case
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(refFrame.mDescriptors);
         pVoc->transform(vCurrentDesc, refFrame.mBowVec, refFrame.mFeatVec, levelsup);
+    }
+
+    void AuxiliaryFrameDatabase::computeAuxiliaryFrameBoW(AuxiliaryFrame &refAuxFrame, int levelsup)
+    {
+        vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(refAuxFrame.GetFrame().mDescriptors);
+        pVoc->transform(vCurrentDesc, refAuxFrame.mBoWAndFeatureVecs.mAuxBowVec, refAuxFrame.mBoWAndFeatureVecs.mAuxFeatVec, levelsup);
+    }
+
+    AuxiliaryFrame::BoWAndFeatureVecs AuxiliaryFrameDatabase::getAuxiliaryBoW(const Frame &refFrame, uint levelsup)
+    {
+        AuxiliaryFrame::BoWAndFeatureVecs outStruct;
+        if (AuxiliaryFrameDatabase::pVoc == nullptr)
+        {
+            std::cerr << "AuxiliaryFrameDatabase::getAuxiliaryBoW -> Vocabulary is not set!" << std::endl;
+            return outStruct;
+        }
+        vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(refFrame.mDescriptors);
+        pVoc->transform(vCurrentDesc, outStruct.mAuxBowVec, outStruct.mAuxFeatVec, static_cast<int>(levelsup));
+        return outStruct;
     }
 
     std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectCandidates(Frame &refFrame)
@@ -200,27 +230,31 @@ namespace ORB_SLAM3
         if (refFrame.mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            computeAuxiliaryBoW(refFrame);
+            computeFrameBoW(refFrame);
         }
 
-        const auto &refBowVec = refFrame.mBowVec;
+        auto ptrBowVec = &refFrame.mBowVec;
+        AuxiliaryFrame::BoWAndFeatureVecs auxBoWAndFeatStruct;
+
+        if (bUseAuxiliaryFrameBoW)
+        {
+            auxBoWAndFeatStruct = getAuxiliaryBoW(refFrame, iVocTreeLevelsUp);
+            ptrBowVec = &auxBoWAndFeatStruct.mAuxBowVec;
+        }
 
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
-        for (auto vit = refBowVec.begin(), vend = refBowVec.end(); vit != vend; vit++)
+        for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++) // assuming BoW vec is not empty
         {
             for (auto &auxFrame : vInvertedFile[vit->first])
             {
-                if (!auxFrame->GetFrame().mBowVec.empty())
+                if (auxFrame->mnRelocQuery != refFrame.mnId)
                 {
-                    if (auxFrame->mnRelocQuery != refFrame.mnId)
-                    {
-                        auxFrame->mnRelocWords = 0;
-                        auxFrame->mnRelocQuery = refFrame.mnId;
-                        lFramesSharingWords.push_back(auxFrame);
-                    }
-                    auxFrame->mnRelocWords++;
+                    auxFrame->mnRelocWords = 0;
+                    auxFrame->mnRelocQuery = refFrame.mnId;
+                    lFramesSharingWords.push_back(auxFrame);
                 }
+                auxFrame->mnRelocWords++;
             }
         }
 
@@ -251,8 +285,13 @@ namespace ORB_SLAM3
         {
             if (auxFrame->mnRelocWords > minCommonWords)
             {
+                float si = 0;
+                if (bUseAuxiliaryFrameBoW)
+                    si = pVoc->score(*ptrBowVec, auxFrame->mBoWAndFeatureVecs.mAuxBowVec);
+                else
+                    si = pVoc->score(*ptrBowVec, auxFrame->GetFrame().mBowVec);
+
                 nscores++;
-                float si = pVoc->score(refBowVec, auxFrame->GetFrame().mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -285,18 +324,21 @@ namespace ORB_SLAM3
         if (refFrame.mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            computeAuxiliaryBoW(refFrame);
+            computeFrameBoW(refFrame);
         }
 
-        const auto &refBowVec = refFrame.mBowVec; // default 4 levelup of voc tree
+        auto ptrBowVec = &refFrame.mBowVec;
+        AuxiliaryFrame::BoWAndFeatureVecs auxBoWAndFeatStruct;
 
-        // // compute 5th level up BoW vector and use it for comparison
-        // const auto vBow5thLevelUp = computeAuxiliaryBoW(pF, 5); // 5th levelup of voc tree
-        // const auto pBowVec = &vBow5thLevelUp;
+        if (bUseAuxiliaryFrameBoW)
+        {
+            auxBoWAndFeatStruct = getAuxiliaryBoW(refFrame, iVocTreeLevelsUp);
+            ptrBowVec = &auxBoWAndFeatStruct.mAuxBowVec;
+        }
 
         list<AuxiliaryFrame *> lFramesSharingWords;
         // find all frames sharing words with the query
-        for (auto vit = refBowVec.begin(), vend = refBowVec.end(); vit != vend; vit++)
+        for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++)
         {
             // last candidatesNum of inverted file list will be used
             if (vInvertedFile[vit->first].empty())
@@ -309,21 +351,17 @@ namespace ORB_SLAM3
                 const auto ptrAuxBuf = *rit;
                 if (ptrAuxBuf && ptrAuxBuf->isInternalFrameValid())
                 {
-                    if (!ptrAuxBuf->GetFrame().mBowVec.empty())
+                    if (ptrAuxBuf->mnRelocQuery != refFrame.mnId) // assuming BoW vec is not empty
                     {
-                        if (ptrAuxBuf->mnRelocQuery != refFrame.mnId)
-                        {
-                            ptrAuxBuf->mnRelocWords = 0;
-                            ptrAuxBuf->mnRelocQuery = refFrame.mnId;
-                            lFramesSharingWords.push_back(ptrAuxBuf);
-                            count++;
-
-                            if (count == candidatesNum)
-                                break;
-                        }
-                        ptrAuxBuf->mnRelocWords++;
+                        ptrAuxBuf->mnRelocWords = 0;
+                        ptrAuxBuf->mnRelocQuery = refFrame.mnId;
+                        lFramesSharingWords.push_back(ptrAuxBuf);
+                        count++;
                     }
+                    ptrAuxBuf->mnRelocWords++;
                 }
+                if (count == candidatesNum)
+                    break;
             }
             if (count == candidatesNum)
                 break;
@@ -344,7 +382,7 @@ namespace ORB_SLAM3
             }
         }
 
-        int minCommonWords = maxCommonWords * 0.8f;
+        int minCommonWords = maxCommonWords * 0.7f;
 
         list<pair<float, AuxiliaryFrame *>> lScoreAndMatch;
 
@@ -356,8 +394,13 @@ namespace ORB_SLAM3
         {
             if (auxFrame->mnRelocWords > minCommonWords)
             {
+                float si = 0;
+                if (bUseAuxiliaryFrameBoW)
+                    si = pVoc->score(*ptrBowVec, auxFrame->mBoWAndFeatureVecs.mAuxBowVec);
+                else
+                    si = pVoc->score(*ptrBowVec, auxFrame->GetFrame().mBowVec);
+
                 nscores++;
-                float si = pVoc->score(refBowVec, auxFrame->GetFrame().mBowVec);
                 if (si > bestAccScore)
                 {
                     bestAccScore = si;
@@ -369,12 +412,12 @@ namespace ORB_SLAM3
         if (lScoreAndMatch.empty())
             return std::vector<AuxiliaryFrame *>();
 
-        // return those that are within the 80% of the best score
+        // return those that are within the N% of the best score
         std::vector<AuxiliaryFrame *> vAuxFrames;
         vAuxFrames.reserve(lScoreAndMatch.size());
         for (const auto &scoreAndMatch : lScoreAndMatch)
         {
-            if (scoreAndMatch.first > 0.8f * bestAccScore)
+            if (scoreAndMatch.first > 0.7f * bestAccScore)
             {
                 vAuxFrames.push_back(scoreAndMatch.second);
             }
@@ -383,7 +426,7 @@ namespace ORB_SLAM3
         return vAuxFrames;
     }
 
-    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNBestCandidates(Frame &refFrame, int candidatesNum) // TODO: test
+    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectNBestCandidates(Frame &refFrame, int candidatesNum)
     {
         // Same as DetectCandidates, except we will be using a comparator to sort candidates with respect to their scores
 
@@ -394,10 +437,17 @@ namespace ORB_SLAM3
         if (refFrame.mBowVec.empty())
         {
             // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
-            computeAuxiliaryBoW(refFrame);
+            computeFrameBoW(refFrame);
         }
 
-        const auto pBowVec = &refFrame.mBowVec;
+        auto ptrBowVec = &refFrame.mBowVec;
+        AuxiliaryFrame::BoWAndFeatureVecs auxBoWAndFeatStruct;
+
+        if (bUseAuxiliaryFrameBoW)
+        {
+            auxBoWAndFeatStruct = getAuxiliaryBoW(refFrame, iVocTreeLevelsUp);
+            ptrBowVec = &auxBoWAndFeatStruct.mAuxBowVec;
+        }
 
         // std::cout << "AuxiliaryFrameDatabase::DetectNBestCandidates -> lLastIvertedFileIndices size : " << lLastIvertedFileIndices.getSize() << std::endl;
 
@@ -412,7 +462,12 @@ namespace ORB_SLAM3
             // compute score for each frame in db and add to priority queue
             if (auxFrameIndex && auxFrameIndex->isInternalFrameValid())
             {
-                auto score = pVoc->score(*pBowVec, auxFrameIndex->GetFrame().mBowVec);
+                float score = 0;
+                if (bUseAuxiliaryFrameBoW)
+                    score = pVoc->score(*ptrBowVec, auxFrameIndex->mBoWAndFeatureVecs.mAuxBowVec);
+                else
+                    score = pVoc->score(*ptrBowVec, auxFrameIndex->GetFrame().mBowVec);
+
                 // std::cout << "AuxiliaryFrameDatabase::DetectNBestCandidates -> score : " << score << " between " << refFrame.mnId << " and " << auxFrameIndex->GetFrame().mnId << std::endl;
                 sortedCandidates.insert(std::make_pair(auxFrameIndex.get(), score));
             }
@@ -439,7 +494,7 @@ namespace ORB_SLAM3
         return vAuxFrames;
     }
 
-    std::vector<KeyFrame *> AuxiliaryFrameDatabase::DetectCandidatesViaKFs(Frame &refFrame)
+    std::vector<KeyFrame *> AuxiliaryFrameDatabase::DetectCandidatesViaKFs(Frame &refFrame) // TODO: test
     {
         // NOTE: this is same as the DetectRelocalizationCandidates in KeyFrameDatabase, except we will use reference KeyFrames of Frames in the auxiliary database
         // in addition, we are assuming KFs are in same map since we should be in localization-only mode when this method is used

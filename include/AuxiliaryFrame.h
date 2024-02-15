@@ -31,7 +31,7 @@ namespace ORB_SLAM3
 
         Frame &GetFrame() const
         {
-            return *(pFrame.get());
+            return *pFrame;
         }
 
         // Variables used by the keyframe database during relocalization
@@ -40,7 +40,12 @@ namespace ORB_SLAM3
         float mRelocScore{0};
 
         int iFrameID{-1};
-        DBoW2::BowVector mAuxBowVec; // BoW vector calculated via 5th levels up of vocabulary tree
+
+        struct BoWAndFeatureVecs
+        {
+            DBoW2::BowVector mAuxBowVec;
+            DBoW2::FeatureVector mAuxFeatVec;
+        } mBoWAndFeatureVecs;
 
     protected:
         // original frame, get ownership since it is local

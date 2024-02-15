@@ -27,6 +27,7 @@
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "Frame.h"
+#include "AuxiliaryFrameDatabase.h"
 
 namespace ORB_SLAM3
 {
@@ -71,6 +72,7 @@ namespace ORB_SLAM3
 
         // search by using auxiliary frame database instead of keyframe database
         int SearchByBoW(const Frame &refFrame, Frame &F, vector<MapPoint *> &vpMapPointMatches);
+        int SearchByBoW(const AuxiliaryFrame& refAuxFrame, const Frame& refCurrentFrame, vector<MapPoint *> &vpMapPointMatches);
 
         // Matching for the Map Initialization (only used in the monocular case)
         int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize = 10);

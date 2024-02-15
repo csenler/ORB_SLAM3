@@ -34,7 +34,9 @@ namespace ORB_SLAM3
         void SetORBVocabulary(ORBVocabulary *pORBVoc);
         unsigned long long getTotalFrameSize() const;
         void truncateDatabase();
-        void computeAuxiliaryBoW(Frame &refFrame, int levelsup = 4);
+        void computeAuxiliaryFrameBoW(AuxiliaryFrame &refAuxFrame, int levelsup = 4);
+        void computeFrameBoW(Frame &refFrame, int levelsup = 4);
+        static AuxiliaryFrame::BoWAndFeatureVecs getAuxiliaryBoW(const Frame &refFrame, uint levelsup);
 
         // compute similarity score between two frames and decide whether to add the frame to the database
         bool shouldBeAddedToDb(const Frame &refFrame);
@@ -46,19 +48,35 @@ namespace ORB_SLAM3
         // Detect Best Candidates to save time
         std::vector<AuxiliaryFrame *> DetectNBestCandidates(Frame &refFrame, int candidatesNum); // TODO
         // DetectCandidates by iterating thrgough reference keyframe of each frame in the inverted file
-        std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame& refFrame);
+        std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame &refFrame);
 
         // // circular list overflow callbcak
         // void circularListOverflowCallback(AuxiliaryFrame *&refAuxFrame); // ref needs to be constant so compiler knows i wont modify it -_-
+
+        void setVocTreeLevelsUp(const uint &levelsup);
+
+        static ORBVocabulary *getAuxiliaryVocabulary()
+        {
+            return AuxiliaryFrameDatabase::pVoc.get();
+        }
+
+        static uint getVocTreeLevelsUp()
+        {
+            return AuxiliaryFrameDatabase::iVocTreeLevelsUp;
+        }
+
+        bool isAuxiliaryBoWAndFeatVecsInUse() const
+        {
+            return bUseAuxiliaryFrameBoW;
+        }
 
     protected:
         // inline static int AUX_DB_CAPACITY_PER_WORD = 300; // if 30 fps, 10 seconds = 300 frames
         inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 300;
         inline static unsigned long long ullTotalFramesInDb = 0;
         inline static int iAuxFrameID = 0;
-
         // Associated vocabulary
-        std::shared_ptr<ORBVocabulary> pVoc{nullptr};
+        inline static std::shared_ptr<ORBVocabulary> pVoc = nullptr;
 
         // Inverted file
         std::vector<std::list<AuxiliaryFrame *>> vInvertedFile;
@@ -72,6 +90,10 @@ namespace ORB_SLAM3
 
         // Mutex
         std::mutex mMutex;
+
+        // vocabulary tree levelsup
+        inline static uint iVocTreeLevelsUp = 4;
+        bool bUseAuxiliaryFrameBoW{false};
 
     private:
         // compare score between auxiliary frames for priority queue
