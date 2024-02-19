@@ -12,6 +12,7 @@
 #include "AuxiliaryFrame.h"
 #include <stack_buffer.h>
 #include <circular_list.h>
+#include <decay_sampler.h>
 
 namespace ORB_SLAM3
 {
@@ -49,9 +50,21 @@ namespace ORB_SLAM3
         std::vector<AuxiliaryFrame *> DetectNBestCandidates(Frame &refFrame, int candidatesNum); // TODO
         // DetectCandidates by iterating thrgough reference keyframe of each frame in the inverted file
         std::vector<KeyFrame *> DetectCandidatesViaKFs(Frame &refFrame);
+        // DetectNCandidates, but will use aux buf frames corresponding to weighted indices
+        std::vector<AuxiliaryFrame *> DetectCandidatesViaWeightedIndices(Frame &refFrame, int candidatesNum);
 
         // // circular list overflow callbcak
         // void circularListOverflowCallback(AuxiliaryFrame *&refAuxFrame); // ref needs to be constant so compiler knows i wont modify it -_-
+
+        static std::vector<int> calculateSamplingIndices(const int outputSize = 30, const int inputSize = 300, const double decayFactor = 0.5)
+        {
+            return ExponentialDecaySampler<int>::sampleIndices(outputSize, inputSize, decayFactor);
+        }
+
+        static std::vector<int> getSamplingIndices()
+        {
+            return vExpDecaySamplingIndices;
+        }
 
         void setVocTreeLevelsUp(const uint &levelsup);
 
@@ -77,6 +90,8 @@ namespace ORB_SLAM3
         inline static int iAuxFrameID = 0;
         // Associated vocabulary
         inline static std::shared_ptr<ORBVocabulary> pVoc = nullptr;
+
+        inline static std::vector<int> vExpDecaySamplingIndices = AuxiliaryFrameDatabase::calculateSamplingIndices(30, AUX_DB_CAPACITY_TOTAL, 0.5);
 
         // Inverted file
         std::vector<std::list<AuxiliaryFrame *>> vInvertedFile;

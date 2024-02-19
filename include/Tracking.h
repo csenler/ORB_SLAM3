@@ -236,6 +236,7 @@ namespace ORB_SLAM3
                 bIsLoadedMap = false;
                 iCurrentMapID = -1;
                 iAuxiliaryDbAddElapedTimeMs = 0;
+                bIsLocalizationOnlyMode = false;
 
                 vRelocStats.clear();
             }
@@ -259,6 +260,7 @@ namespace ORB_SLAM3
             int iNumOfMapPoints{0}; // this may be useful when in mapping(slam) mode
             bool bIsLoadedMap{false};
             int iCurrentMapID{-1};
+            bool bIsLocalizationOnlyMode{false};
 
             struct RelocStats
             {

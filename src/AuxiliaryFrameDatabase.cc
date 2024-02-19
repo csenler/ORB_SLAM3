@@ -337,6 +337,7 @@ namespace ORB_SLAM3
         }
 
         list<AuxiliaryFrame *> lFramesSharingWords;
+
         // find all frames sharing words with the query
         for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++)
         {
@@ -365,6 +366,158 @@ namespace ORB_SLAM3
             }
             if (count == candidatesNum)
                 break;
+        }
+
+        if (lFramesSharingWords.empty())
+        {
+            return std::vector<AuxiliaryFrame *>();
+        }
+
+        // Only compare against those keyframes that share enough words
+        int maxCommonWords = 0;
+        for (const auto auxFrame : lFramesSharingWords)
+        {
+            if (auxFrame->mnRelocWords > maxCommonWords)
+            {
+                maxCommonWords = auxFrame->mnRelocWords;
+            }
+        }
+
+        int minCommonWords = maxCommonWords * 0.7f;
+
+        list<pair<float, AuxiliaryFrame *>> lScoreAndMatch;
+
+        int nscores = 0;
+
+        // Compute similarity and best score
+        float bestAccScore = 0;
+        for (const auto auxFrame : lFramesSharingWords)
+        {
+            if (auxFrame->mnRelocWords > minCommonWords)
+            {
+                float si = 0;
+                if (bUseAuxiliaryFrameBoW)
+                    si = pVoc->score(*ptrBowVec, auxFrame->mBoWAndFeatureVecs.mAuxBowVec);
+                else
+                    si = pVoc->score(*ptrBowVec, auxFrame->GetFrame().mBowVec);
+
+                nscores++;
+                if (si > bestAccScore)
+                {
+                    bestAccScore = si;
+                }
+                lScoreAndMatch.push_back(make_pair(si, auxFrame));
+            }
+        }
+
+        if (lScoreAndMatch.empty())
+            return std::vector<AuxiliaryFrame *>();
+
+        // return those that are within the N% of the best score
+        std::vector<AuxiliaryFrame *> vAuxFrames;
+        vAuxFrames.reserve(lScoreAndMatch.size());
+        for (const auto &scoreAndMatch : lScoreAndMatch)
+        {
+            if (scoreAndMatch.first > 0.7f * bestAccScore)
+            {
+                vAuxFrames.push_back(scoreAndMatch.second);
+            }
+        }
+
+        return vAuxFrames;
+    }
+
+    std::vector<AuxiliaryFrame *> AuxiliaryFrameDatabase::DetectCandidatesViaWeightedIndices(Frame &refFrame, int candidatesNum)
+    {
+        // TODO: check if vocabulary is same here
+        if (refFrame.mBowVec.empty())
+        {
+            // first, compurt BoW for auxiliary database (if vocabularies are same, should not be needed, but just in case)
+            computeFrameBoW(refFrame);
+        }
+
+        auto ptrBowVec = &refFrame.mBowVec;
+        AuxiliaryFrame::BoWAndFeatureVecs auxBoWAndFeatStruct;
+
+        if (bUseAuxiliaryFrameBoW)
+        {
+            auxBoWAndFeatStruct = getAuxiliaryBoW(refFrame, iVocTreeLevelsUp);
+            ptrBowVec = &auxBoWAndFeatStruct.mAuxBowVec;
+        }
+
+        list<AuxiliaryFrame *> lFramesSharingWords;
+
+        if (lLastIvertedFileIndices.getSize() == 300) // use sampled indices only if list is full (indices assume 300 frames are present)
+        {
+            std::vector<AuxiliaryFrame *> vSampledFramePointers;
+            // get frame pointers for comparison
+            for (const auto &weightedIndex : vExpDecaySamplingIndices)
+            {
+                const auto &auxFrame = lLastIvertedFileIndices.at(weightedIndex);
+                vSampledFramePointers.push_back(auxFrame.get());
+            }
+            // find all frames sharing words with the query
+            for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++)
+            {
+                // last candidatesNum of inverted file list will be used
+                if (vInvertedFile[vit->first].empty())
+                    continue;
+
+                const auto &tempListRef = vInvertedFile[vit->first];
+                int count = 0;
+                for (auto rit = tempListRef.rbegin(); rit != tempListRef.rend(); ++rit)
+                {
+                    const auto ptrAuxBuf = *rit;
+                    const auto bIsSampledFrame = std::find(vSampledFramePointers.begin(), vSampledFramePointers.end(), ptrAuxBuf) != vSampledFramePointers.end(); // true if ptrAuxBuf is in vSampledFramePointers
+                    if (ptrAuxBuf && ptrAuxBuf->isInternalFrameValid() && bIsSampledFrame)                                                                        // will skip if not in vSampledFramePointers
+                    {
+                        if (ptrAuxBuf->mnRelocQuery != refFrame.mnId) // assuming BoW vec is not empty
+                        {
+                            ptrAuxBuf->mnRelocWords = 0;
+                            ptrAuxBuf->mnRelocQuery = refFrame.mnId;
+                            lFramesSharingWords.push_back(ptrAuxBuf);
+                            count++;
+                        }
+                        ptrAuxBuf->mnRelocWords++;
+                    }
+                    if (count == candidatesNum)
+                        break;
+                }
+                if (count == candidatesNum)
+                    break;
+            }
+        }
+        else
+        {
+            // find all frames sharing words with the query
+            for (auto vit = ptrBowVec->begin(), vend = ptrBowVec->end(); vit != vend; vit++)
+            {
+                // last candidatesNum of inverted file list will be used
+                if (vInvertedFile[vit->first].empty())
+                    continue;
+
+                const auto &tempListRef = vInvertedFile[vit->first];
+                int count = 0;
+                for (auto rit = tempListRef.rbegin(); rit != tempListRef.rend(); ++rit)
+                {
+                    const auto ptrAuxBuf = *rit;
+                    if (ptrAuxBuf && ptrAuxBuf->isInternalFrameValid())
+                    {
+                        if (ptrAuxBuf->mnRelocQuery != refFrame.mnId) // assuming BoW vec is not empty
+                        {
+                            ptrAuxBuf->mnRelocWords = 0;
+                            ptrAuxBuf->mnRelocQuery = refFrame.mnId;
+                            lFramesSharingWords.push_back(ptrAuxBuf);
+                            count++;
+                        }
+                        ptrAuxBuf->mnRelocWords++;
+                    }
+                    if (count == candidatesNum)
+                        break;
+                }
+                if (count == candidatesNum)
+                    break;
+            }
         }
 
         if (lFramesSharingWords.empty())
