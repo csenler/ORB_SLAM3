@@ -4163,9 +4163,9 @@ namespace ORB_SLAM3
         const auto ptrAuxDB = ptrAuxiliaryFrameStorage->GetAuxFrameDB();
         Verbose::PrintMess("RelocalizationViaExternalBuffer -> current aux db frame size: " + std::to_string(ptrAuxDB->getTotalFrameSize()), Verbose::VERBOSITY_NORMAL);
         // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidates(&mCurrentFrame);
-        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(mCurrentFrame, 30); // default method
+        // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNCandidates(mCurrentFrame, 30); // default method
         // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectNBestCandidates(&mCurrentFrame, 30); // NOTE: worse performance than DetectNCandidates, very few inliers if any
-        // auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidatesViaWeightedIndices(mCurrentFrame, 30);
+        auto vCandidateAuxiliaryFrames = ptrAuxDB->DetectCandidatesViaWeightedIndices(mCurrentFrame, 30);
 
         if (vCandidateAuxiliaryFrames.empty())
         {
