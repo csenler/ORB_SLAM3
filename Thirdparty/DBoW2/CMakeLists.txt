@@ -29,7 +29,8 @@ set(SRCS_DUTILS
   DUtils/Timestamp.cpp)
 
 
-find_package(OpenCV 4 QUIET)
+# find_package(OpenCV 4 QUIET)
+find_package(OpenCV 4 QUIET PATHS ${PROJECT_SOURCE_DIR}/../../../opencv_4.6.0)
 if(NOT OpenCV_FOUND)
    find_package(OpenCV 3.0 QUIET)
    if(NOT OpenCV_FOUND)
