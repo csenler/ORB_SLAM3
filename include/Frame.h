@@ -246,6 +246,13 @@ namespace ORB_SLAM3
         std::vector<cv::KeyPoint> mvKeys, mvKeysRight;
         std::vector<cv::KeyPoint> mvKeysUn;
 
+        // orb keypoints that will be used by vlad matcher, duplicate of mvKeys since new keypoints may be added or removed by sift descriptor at vlad matcher
+        std::vector<cv::KeyPoint> mvKeysForVlad;
+        cv::Mat mRootSiftDescriptorsForVlad;
+
+        // for binary vlad calculation
+        cv::Mat mBinaryVladVector;
+
         // Corresponding stereo coordinate and depth for each keypoint.
         std::vector<MapPoint *> mvpMapPoints;
         // "Monocular" keypoints have a negative value.
@@ -389,6 +396,9 @@ namespace ORB_SLAM3
         }
 
         Sophus::SE3<double> T_test;
+
+        // for sift calculation, will be released afterwards
+        cv::Mat tempImGray;
     };
 
 } // namespace ORB_SLAM

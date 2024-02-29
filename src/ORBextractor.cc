@@ -1198,4 +1198,38 @@ namespace ORB_SLAM3
         }
     }
 
+    // void ORBextractor::ComputePyramid(const cv::Mat &image)
+    // {
+    //     for (int level = 0; level < nlevels; ++level)
+    //     {
+    //         float scale = mvInvScaleFactor[level];
+    //         Size sz(cvRound((float)image.cols * scale), cvRound((float)image.rows * scale));
+    //         Size wholeSize(sz.width + ORBextractor::EDGE_THRESHOLD * 2, sz.height + ORBextractor::EDGE_THRESHOLD * 2);
+
+    //         // Create a new Mat for the current level based on calculated size.
+    //         Mat currentLevel(wholeSize, image.type()), temp, masktemp;
+
+    //         // Compute the resized image
+    //         if (level != 0)
+    //         {
+    //             // Resize from the previous level
+    //             resize(mvImagePyramid[level - 1], temp, sz, 0, 0, INTER_LINEAR);
+    //         }
+    //         else
+    //         {
+    //             // For the first level, use the original image
+    //             temp = image.clone();
+    //             resize(temp, temp, sz, 0, 0, INTER_LINEAR);
+    //         }
+
+    //         // Apply border to the resized image and store in currentLevel
+    //         copyMakeBorder(temp, currentLevel, ORBextractor::EDGE_THRESHOLD, ORBextractor::EDGE_THRESHOLD, ORBextractor::EDGE_THRESHOLD, ORBextractor::EDGE_THRESHOLD,
+    //                        level == 0 ? BORDER_REFLECT_101 : BORDER_REFLECT_101 + BORDER_ISOLATED);
+
+    //         // Assign the prepared image with borders to the pyramid.
+    //         // This avoids directly using the 'temp' Mat, ensuring 'temp' has been properly initialized and manipulated before assignment.
+    //         mvImagePyramid[level] = currentLevel(Rect(ORBextractor::EDGE_THRESHOLD, ORBextractor::EDGE_THRESHOLD, sz.width, sz.height)).clone();
+    //     }
+    // }
+
 } // namespace ORB_SLAM

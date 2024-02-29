@@ -207,6 +207,19 @@ namespace ORB_SLAM3
             return iORBmatcherMultiplicationFactor;
         }
 
+        void setVladMatcherCallback(std::function<void(ORB_SLAM3::Frame &frame)> func)
+        {
+            funcTrackingVladCallback = func;
+        }
+
+        void callVladMatcherCallback(ORB_SLAM3::Frame &frame)
+        {
+            if (funcTrackingVladCallback)
+            {
+                funcTrackingVladCallback(frame);
+            }
+        }
+
         // statistics for measuring Track success
         struct TrackStatistics // TODO: update this for new RelocalizationWithExternalBuffer method
         {
@@ -612,6 +625,9 @@ namespace ORB_SLAM3
 
         // auxiliary db diasble flag
         std::atomic<bool> bDisableAuxiliaryDB{false};
+
+        // callback function for vlad matcher
+        std::function<void(ORB_SLAM3::Frame &frame)> funcTrackingVladCallback;
 
     public:
         cv::Mat mImRight;

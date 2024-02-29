@@ -316,6 +316,9 @@ namespace ORB_SLAM3
         if (mvKeys.empty())
             return;
 
+        // temp for sift calculation, will be released afterwards from Tracking to save memory
+        tempImGray = imGray;
+
         UndistortKeyPoints();
 
         // Set no stereo information

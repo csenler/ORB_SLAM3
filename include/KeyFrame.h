@@ -188,6 +188,12 @@ namespace ORB_SLAM3
             ar &boost::serialization::make_array(mVw.data(), mVw.size());
             ar &boost::serialization::make_array(mOwb.data(), mOwb.size());
             ar & mbHasVelocity;
+
+            if (version >= 1)
+            {
+                // for vlad
+                serializeMatrix<Archive>(ar, mRootSiftDescriptorsForVlad, version);
+            }
         }
 
     public:
@@ -381,6 +387,9 @@ namespace ORB_SLAM3
         const std::vector<float> mvDepth;  // negative value for monocular points
         const cv::Mat mDescriptors;
 
+        // for vlad
+        const cv::Mat mRootSiftDescriptorsForVlad;
+
         // BoW
         DBoW2::BowVector mBowVec;
         DBoW2::FeatureVector mFeatVec;
@@ -540,5 +549,8 @@ namespace ORB_SLAM3
     };
 
 } // namespace ORB_SLAM
+
+// Define a version number for the class
+BOOST_CLASS_VERSION(ORB_SLAM3::KeyFrame, 1)
 
 #endif // KEYFRAME_H

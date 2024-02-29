@@ -28,9 +28,13 @@ set(SRCS_DUTILS
   DUtils/Random.cpp
   DUtils/Timestamp.cpp)
 
+set(OpenCV_DIR "/home/csenler/cpp_ws/opencv_install/lib/cmake/opencv4")
 
-# find_package(OpenCV 4 QUIET)
-find_package(OpenCV 4 QUIET PATHS ${PROJECT_SOURCE_DIR}/../../../opencv_4.6.0)
+find_package(OpenCV 4 QUIET)
+# find_package(OpenCV 4 QUIET PATHS ${PROJECT_SOURCE_DIR}/../../../opencv_4.6.0)
+message(STATUS "DBoW2 -> OpenCV version: ${OpenCV_VERSION}")
+message(STATUS "DBoW2 -> OpenCV DIR: ${OpenCV_DIR}")
+
 if(NOT OpenCV_FOUND)
    find_package(OpenCV 3.0 QUIET)
    if(NOT OpenCV_FOUND)

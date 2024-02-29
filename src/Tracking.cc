@@ -1687,6 +1687,19 @@ namespace ORB_SLAM3
 
         const auto retPose = mCurrentFrame.GetPose(); // save pose to return later
 
+        // calculate sift descriptors for current frame if system is initialized
+        if (mState != SYSTEM_NOT_READY && mState != NO_IMAGES_YET && mState != NOT_INITIALIZED)
+        {
+            const auto timeRef = std::chrono::high_resolution_clock::now();
+            // call Vlad matcher to create rootsift desciptors since we now have frame
+            callVladMatcherCallback(mCurrentFrame);
+            // release temp image
+            mCurrentFrame.tempImGray.release();
+            const auto timeNow = std::chrono::high_resolution_clock::now();
+            const auto elapsed_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeRef).count();
+            Verbose::PrintMess("GrabImageMonoular -> vlad matcher elapsed time (ms): " + std::to_string(elapsed_time_ms), Verbose::VERBOSITY_NORMAL);
+        }
+
         // calculate this before MP cleanup -> MP size and KeyPoints sizes are same due to initial allocation, after mappoint cleanup there will be nullptrs, calculate statistics beforehand just in case
         CalculateMatchCountsForStatistics(mCurrentFrame);
 
