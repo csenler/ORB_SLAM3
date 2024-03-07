@@ -2327,7 +2327,7 @@ namespace ORB_SLAM3
             }
         }
 
-        std::cout << "ORBmatcher::SearchByProjection: nmatches size BEFORE orientation check = " << nmatches << std::endl;
+        // std::cout << "ORBmatcher::SearchByProjection: nmatches size BEFORE orientation check = " << nmatches << std::endl;
 
         // Apply rotation consistency
         if (mbCheckOrientation)
@@ -2351,7 +2351,7 @@ namespace ORB_SLAM3
             }
         }
 
-        std::cout << "ORBmatcher::SearchByProjection: nmatches size AFTER orientation check = " << nmatches << std::endl;
+        // std::cout << "ORBmatcher::SearchByProjection: nmatches size AFTER orientation check = " << nmatches << std::endl;
 
         return nmatches;
     }

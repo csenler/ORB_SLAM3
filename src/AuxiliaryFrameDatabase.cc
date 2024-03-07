@@ -774,4 +774,38 @@ namespace ORB_SLAM3
 
         return vpRelocCandidates;
     }
+
+    std::vector<Frame *> AuxiliaryFrameDatabase::getSampledFramesForVisualOdometry()
+    {
+        std::vector<Frame *> vSampledFrames; // should be N samples (hardcoded to 30 for now)
+        vSampledFrames.reserve(30);
+        if (lLastIvertedFileIndices.getSize() == 300)
+        {
+            for (const auto &weightedIndex : vExpDecaySamplingIndices)
+            {
+                const auto &auxFrame = lLastIvertedFileIndices.at(weightedIndex);
+                if (auxFrame && auxFrame->isInternalFrameValid())
+                {
+                    vSampledFrames.push_back(&auxFrame->GetFrame());
+                }
+            }
+        }
+        else
+        {
+            // return as many frames as possible (up to N frames)
+            int count = 0;
+            const auto frameLimit = 30;
+            for (const auto &auxFrame : lLastIvertedFileIndices)
+            {
+                if (auxFrame && auxFrame->isInternalFrameValid())
+                {
+                    vSampledFrames.push_back(&auxFrame->GetFrame());
+                    count++;
+                }
+                if (count == frameLimit)
+                    break;
+            }
+        }
+        return vSampledFrames;
+    }
 }

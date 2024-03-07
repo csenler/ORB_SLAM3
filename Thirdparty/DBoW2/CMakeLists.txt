@@ -28,9 +28,25 @@ set(SRCS_DUTILS
   DUtils/Random.cpp
   DUtils/Timestamp.cpp)
 
-set(OpenCV_DIR "/home/csenler/cpp_ws/opencv_install/lib/cmake/opencv4")
+# set(OpenCV_DIR "/home/csenler/cpp_ws/opencv_install/lib/cmake/opencv4")
+## check if OPENCV_CUSTOM_INSTALL_PATH environment variable is set and OpenCV found there has xfeatures2d module
+if(DEFINED ENV{OPENCV_CUSTOM_INSTALL_PATH})
+  message("OPENCV_CUSTOM_INSTALL_PATH is set")
+  set(OPENCV_CUSTOM_INSTALL_PATH $ENV{OPENCV_CUSTOM_INSTALL_PATH})
+  message("OPENCV_CUSTOM_INSTALL_PATH : " ${OPENCV_CUSTOM_INSTALL_PATH})
+  find_package(OpenCV 4.2 EXACT REQUIRED PATHS $ENV{OPENCV_CUSTOM_INSTALL_PATH} NO_DEFAULT_PATH)
+  if(NOT OpenCV_FOUND)
+    message(FATAL_ERROR "Custom OpenCV (should have contrib and non-free enabled) > 4.2 not found.")
+  endif()
+else()
+  message("OPENCV_CUSTOM_INSTALL_PATH is not set")
+  find_package(OpenCV 4.2 EXACT REQUIRED)
+  if(NOT OpenCV_FOUND)
+    message(FATAL_ERROR "OpenCV > 4.2 not found.")
+  endif()
+endif()
 
-find_package(OpenCV 4 QUIET)
+# find_package(OpenCV 4 QUIET)
 # find_package(OpenCV 4 QUIET PATHS ${PROJECT_SOURCE_DIR}/../../../opencv_4.6.0)
 message(STATUS "DBoW2 -> OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "DBoW2 -> OpenCV DIR: ${OpenCV_DIR}")

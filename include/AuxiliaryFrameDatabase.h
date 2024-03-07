@@ -53,6 +53,9 @@ namespace ORB_SLAM3
         // DetectNCandidates, but will use aux buf frames corresponding to weighted indices
         std::vector<AuxiliaryFrame *> DetectCandidatesViaWeightedIndices(Frame &refFrame, int candidatesNum);
 
+        // get vector of frame pointers for trying visual odomeytry at Tracking
+        std::vector<Frame *> getSampledFramesForVisualOdometry();
+
         // // circular list overflow callbcak
         // void circularListOverflowCallback(AuxiliaryFrame *&refAuxFrame); // ref needs to be constant so compiler knows i wont modify it -_-
 

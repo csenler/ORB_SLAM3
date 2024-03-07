@@ -221,7 +221,7 @@ namespace ORB_SLAM3
         }
 
         // statistics for measuring Track success
-        struct TrackStatistics // TODO: update this for new RelocalizationWithExternalBuffer method
+        struct TrackStatistics
         {
             TrackStatistics()
             {
@@ -251,6 +251,9 @@ namespace ORB_SLAM3
                 iAuxiliaryDbAddElapedTimeMs = 0;
                 bIsLocalizationOnlyMode = false;
 
+                iNumOfTrackViaAuxBufRefCalls = 0;
+                bIsTrackViaAuxBufRefSuccessful = false;
+
                 vRelocStats.clear();
             }
 
@@ -274,6 +277,8 @@ namespace ORB_SLAM3
             bool bIsLoadedMap{false};
             int iCurrentMapID{-1};
             bool bIsLocalizationOnlyMode{false};
+            int iNumOfTrackViaAuxBufRefCalls{0};
+            bool bIsTrackViaAuxBufRefSuccessful{false};
 
             struct RelocStats
             {
@@ -301,6 +306,7 @@ namespace ORB_SLAM3
                     bRelocSuccess = false;
                     iRelocalizaionElapsedTimeMs = 0;
                     iRelocWithExtBufElapsedTimeMs = 0;
+                    iTrackViaAuxBufRefElapsedTimeMs = 0;
                 }
 
                 void reserveVectors(const int &size_)
@@ -335,6 +341,7 @@ namespace ORB_SLAM3
                 // elapsed times
                 int iRelocalizaionElapsedTimeMs{0};
                 int iRelocWithExtBufElapsedTimeMs{0};
+                int iTrackViaAuxBufRefElapsedTimeMs{0};
             };
 
             std::vector<RelocStats> vRelocStats;
@@ -392,6 +399,8 @@ namespace ORB_SLAM3
         bool Relocalization();
         bool Relocalization2();
         bool RelocalizationViaExternalBuffer();
+        bool TryVisualOdomViaExternalBuffer();
+        bool TryTrackViaAuxiliaryBufferReference();
 
         void UpdateLocalMap();
         void UpdateLocalPoints();
