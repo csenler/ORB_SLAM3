@@ -144,6 +144,7 @@ namespace ORB_SLAM3
 
         // set<MapPoint *> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
         set<MapPoint *> spRefMPs;
+        set<MapPoint *> spMarkerPoints;
 
         for (const auto mp : vpRefMPs)
         {
@@ -164,6 +165,13 @@ namespace ORB_SLAM3
         {
             if (!vpMPs[i] || vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
                 continue;
+
+            if (vpMPs[i]->mnMarkerId.load() >= 0)
+            {
+                spMarkerPoints.insert(vpMPs[i]);
+                continue;
+            }
+
             Eigen::Matrix<float, 3, 1> pos = vpMPs[i]->GetWorldPos();
             glVertex3f(pos(0), pos(1), pos(2));
         }
@@ -179,6 +187,17 @@ namespace ORB_SLAM3
             glVertex3f(pos(0), pos(1), pos(2));
         }
 
+        glEnd();
+
+        // draw marker corners separetely
+        glPointSize(mPointSize);
+        glBegin(GL_POINTS);
+        glColor3f(0.0, 1.0, 0.0);
+        for (const auto &mp : spMarkerPoints)
+        {
+            Eigen::Matrix<float, 3, 1> pos = mp->GetWorldPos();
+            glVertex3f(pos(0), pos(1), pos(2));
+        }
         glEnd();
     }
 

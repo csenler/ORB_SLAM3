@@ -72,7 +72,7 @@ namespace ORB_SLAM3
 
         // search by using auxiliary frame database instead of keyframe database
         int SearchByBoW(const Frame &refFrame, Frame &F, vector<MapPoint *> &vpMapPointMatches);
-        int SearchByBoW(const AuxiliaryFrame& refAuxFrame, const Frame& refCurrentFrame, vector<MapPoint *> &vpMapPointMatches);
+        int SearchByBoW(const AuxiliaryFrame &refAuxFrame, const Frame &refCurrentFrame, vector<MapPoint *> &vpMapPointMatches);
 
         // Matching for the Map Initialization (only used in the monocular case)
         int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize = 10);
@@ -80,6 +80,9 @@ namespace ORB_SLAM3
         // Matching to triangulate new MapPoints. Check Epipolar Constraint.
         int SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2,
                                    std::vector<pair<size_t, size_t>> &vMatchedPairs, const bool bOnlyStereo, const bool bCoarse = false);
+
+        // search for matching marker corners in order to create new MapPoints
+        std::vector<pair<size_t, size_t>> SearchMarkerCorners(const std::vector<MARKER_NS::ArucoMarker>& vMarkersKF1, const std::vector<MARKER_NS::ArucoMarker>& vMarkersKF2);
 
         // Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
         // In the stereo and RGB-D case, s12=1

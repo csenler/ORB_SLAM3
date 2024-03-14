@@ -397,7 +397,7 @@ namespace ORB_SLAM3
         bool PredictStateIMU();
 
         bool Relocalization();
-        bool Relocalization2();
+        bool RelocalizationPlusAuxiliaryBuffer();
         bool RelocalizationViaExternalBuffer();
         bool TryVisualOdomViaExternalBuffer();
         bool TryTrackViaAuxiliaryBufferReference();

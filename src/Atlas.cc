@@ -422,4 +422,26 @@ namespace ORB_SLAM3
         return mpIdKFs;
     }
 
+    std::vector<KeyFrame *> Atlas::GetAllKeyFramesWithSameMarkers(KeyFrame *pKF)
+    {
+        std::unique_lock<std::mutex> lock(mMutexAtlas);
+        std::vector<KeyFrame *> vpKFs;
+        const std::vector<int> markerIds = pKF->GetMarkerIds();
+        for (const auto &queryKF : mpCurrentMap->GetAllKeyFrames())
+        {
+            if (queryKF->mnId != pKF->mnId) // protect mnId with mutex ???
+            {
+                for (const auto &markerId : markerIds)
+                {
+                    if (queryKF->HasMarkerId(markerId))
+                    {
+                        vpKFs.push_back(queryKF);
+                        break;
+                    }
+                }
+            }
+        }
+        return vpKFs;
+    }
+
 } // namespace ORB_SLAM3

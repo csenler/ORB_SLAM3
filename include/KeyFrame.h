@@ -507,6 +507,11 @@ namespace ORB_SLAM3
         std::mutex mMutexFeatures;
         std::mutex mMutexMap;
 
+        // markers in this KeyFrame
+        const std::vector<MARKER_NS::ArucoMarker> mvMarkers;
+        std::vector<MapPoint *> mvpMarkerMapPoints;
+        std::mutex mMutexMarkers;
+
     public:
         GeometricCamera *mpCamera, *mpCamera2;
 
@@ -545,6 +550,41 @@ namespace ORB_SLAM3
                 }
             }
             cout << "Point distribution in KeyFrame: left-> " << left << " --- right-> " << right << endl;
+        }
+
+        std::vector<MARKER_NS::ArucoMarker> GetMarkers()
+        {
+            std::unique_lock<std::mutex> lock(mMutexMarkers);
+            return mvMarkers;
+        }
+
+        bool HasMarkerId(const int &id) const
+        {
+            for (const auto &marker : mvMarkers)
+            {
+                if (marker.id == id)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        std::vector<int> GetMarkerIds()
+        {
+            std::unique_lock<std::mutex> lock(mMutexMarkers);
+            std::vector<int> ids;
+            for (const auto &marker : mvMarkers)
+            {
+                ids.push_back(marker.id);
+            }
+            return ids;
+        }
+
+        void AddMarkerMapPoint(MapPoint *pMP, const size_t &idx) // idx coresponds to index in vMarker vector
+        {
+            std::unique_lock<std::mutex> lock(mMutexMarkers);
+            mvpMarkerMapPoints[idx] = pMP;
         }
     };
 

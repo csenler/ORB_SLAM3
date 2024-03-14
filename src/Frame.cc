@@ -30,6 +30,8 @@
 #include <include/CameraModels/Pinhole.h>
 #include <include/CameraModels/KannalaBrandt8.h>
 
+#include "Marker.h"
+
 namespace ORB_SLAM3
 {
 
@@ -375,6 +377,15 @@ namespace ORB_SLAM3
         {
             mVw.setZero();
         }
+
+        // ##### Aruco Marker Related #####
+        // check for markers
+        MARKER_NS::ArucoDetector::detectArucoMarkers(imGray, mvMarkers);
+        // also calculate undistorion for marker corners
+        UndistortMarkerKeyPoints();
+        // mappoints coresponding to marker corners
+        mvpMarkerMapPoints = vector<MapPoint *>(mvMarkers.size(), static_cast<MapPoint *>(NULL));
+        // ##### End Aruco Marker Related #####
 
         mpMutexImu = new std::mutex();
     }
@@ -749,6 +760,58 @@ namespace ORB_SLAM3
             std::cout << "ComputeBoW -> mBowVec size: " << mBowVec.size() << std::endl;
             // std::cout << "ComputerBow -> mBowVec : " << mBowVec << std::endl;
             std::cout << "ComputeBoW -> mFeatVec size: " << mFeatVec.size() << std::endl;
+        }
+    }
+
+    void Frame::UndistortMarkerKeyPoints()
+    {
+        if (mDistCoef.at<float>(0) == 0.0)
+        {
+            for (auto &marker : mvMarkers)
+            {
+                marker.undistortedCornerKeyPoints = marker.cornerKeyPoints;
+            }
+
+            return;
+        }
+
+        for (auto &marker : mvMarkers)
+        {
+            // Fill matrix with points
+            cv::Mat mat(4, 2, CV_32F);
+
+            for (int i = 0; i < 4; i++)
+            {
+                mat.at<float>(i, 0) = marker.cornerKeyPoints[i].pt.x;
+                mat.at<float>(i, 1) = marker.cornerKeyPoints[i].pt.y;
+            }
+
+            // Undistort points
+            mat = mat.reshape(2);
+            cv::undistortPoints(mat, mat, static_cast<Pinhole *>(mpCamera)->toK(), mDistCoef, cv::Mat(), mK);
+            mat = mat.reshape(1);
+
+            // Fill undistorted keypoint vector
+            marker.undistortedCornerKeyPoints.resize(4);
+            marker.undistortedCorners.resize(4);
+            for (int i = 0; i < 4; i++)
+            {
+                cv::KeyPoint kp = marker.cornerKeyPoints[i];
+                kp.pt.x = mat.at<float>(i, 0);
+                kp.pt.y = mat.at<float>(i, 1);
+                marker.undistortedCornerKeyPoints[i] = kp;
+                marker.undistortedCorners[i] = kp.pt;
+
+                // calculate angle by using a vector from diagonally opposite corner to current corner (angle should point outwards from corners, where corners are clockwise starting with top-left)
+                cv::Point2f v1 = marker.undistortedCorners[i];
+                cv::Point2f v2 = marker.undistortedCorners[(i + 2) % 4];
+                // calculate angle from v2 to v1
+                double dy = v1.y - v2.y;
+                double dx = v1.x - v2.x;
+                marker.undistortedCornerKeyPoints[i].angle = atan2(dy, dx) * 180 / M_PI;
+
+                marker.undistortedCornerKeyPoints[i].octave = 0;
+            }
         }
     }
 

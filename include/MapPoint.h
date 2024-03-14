@@ -164,12 +164,19 @@ namespace ORB_SLAM3
             // return false;
         };
 
+        void AddMarkerObservation(KeyFrame *pKF, int idx);
+        int MarkerObservations();
+        void EraseMarkerObservation(KeyFrame *pKF);
+        std::map<KeyFrame *, int> GetMarkerObservations();
+
     public:
         long unsigned int mnId;
         static long unsigned int nNextId;
         long int mnFirstKFid;
         long int mnFirstFrame;
         int nObs;
+
+        int nMarkerObs;
 
         // Variables used by the tracking
         float mTrackProjX;
@@ -209,6 +216,10 @@ namespace ORB_SLAM3
         static std::mutex mGlobalMutex;
 
         unsigned int mnOriginMapId;
+
+        // std::atomic<bool> mbIsMarkerCorner{false};
+        std::atomic<int> mnMarkerId{-1};
+        std::atomic<int> mnMarkerCornerId{-1};
 
     protected:
         // Position in absolute coordinates
@@ -252,6 +263,10 @@ namespace ORB_SLAM3
         std::mutex mMutexMap;
 
         std::atomic<bool> bIsWithoutKFRef{false};
+
+        // for markers (assuming monocular)
+        std::map<KeyFrame *, int> mMarkerObservations;
+        std::mutex mMutexMarker;
     };
 
 } // namespace ORB_SLAM

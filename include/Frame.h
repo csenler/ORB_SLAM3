@@ -38,6 +38,8 @@
 #include "Eigen/Core"
 #include "sophus/se3.hpp"
 
+#include <Marker.h>
+
 namespace ORB_SLAM3
 {
 #define FRAME_GRID_ROWS 48
@@ -253,6 +255,10 @@ namespace ORB_SLAM3
         // for binary vlad calculation
         cv::Mat mBinaryVladVector;
 
+        // markers in this Frame
+        std::vector<MARKER_NS::ArucoMarker> mvMarkers;
+        std::vector<MapPoint *> mvpMarkerMapPoints;
+
         // Corresponding stereo coordinate and depth for each keypoint.
         std::vector<MapPoint *> mvpMapPoints;
         // "Monocular" keypoints have a negative value.
@@ -334,6 +340,8 @@ namespace ORB_SLAM3
         // (called in the constructor).
         void UndistortKeyPoints();
 
+        void UndistortMarkerKeyPoints();
+
         // Computes image bounds for the undistorted image (called in the constructor).
         void ComputeImageBounds(const cv::Mat &imLeft);
 
@@ -399,6 +407,14 @@ namespace ORB_SLAM3
 
         // for sift calculation, will be released afterwards
         cv::Mat tempImGray;
+
+        bool HasMarker() const
+        {
+            if (!mvMarkers.empty())
+                return true;
+
+            return false;
+        }
     };
 
 } // namespace ORB_SLAM

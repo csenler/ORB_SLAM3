@@ -30,7 +30,7 @@ namespace ORB_SLAM3
     MapPoint::MapPoint() : mnFirstKFid(0), mnFirstFrame(0), nObs(0), mnTrackReferenceForFrame(0),
                            mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
                            mnCorrectedReference(0), mnBAGlobalForKF(0), mnVisible(1), mnFound(1), mbBad(false),
-                           mpReplaced(static_cast<MapPoint *>(NULL))
+                           mpReplaced(static_cast<MapPoint *>(NULL)), nMarkerObs(0)
     {
         mpReplaced = static_cast<MapPoint *>(NULL);
     }
@@ -39,7 +39,7 @@ namespace ORB_SLAM3
                                                                                   mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
                                                                                   mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
                                                                                   mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap),
-                                                                                  mnOriginMapId(pMap->GetId())
+                                                                                  mnOriginMapId(pMap->GetId()), nMarkerObs(0)
     {
         SetWorldPos(Pos);
 
@@ -57,7 +57,7 @@ namespace ORB_SLAM3
                                                                                                                      mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
                                                                                                                      mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
                                                                                                                      mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap),
-                                                                                                                     mnOriginMapId(pMap->GetId())
+                                                                                                                     mnOriginMapId(pMap->GetId()), nMarkerObs(0)
     {
         mInvDepth = invDepth;
         mInitU = (double)uv_init.x;
@@ -75,7 +75,7 @@ namespace ORB_SLAM3
     MapPoint::MapPoint(const Eigen::Vector3f &Pos, Map *pMap, Frame *pFrame, const int &idxF) : mnFirstKFid(-1), mnFirstFrame(pFrame->mnId), nObs(0), mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
                                                                                                 mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
                                                                                                 mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(static_cast<KeyFrame *>(NULL)), mnVisible(1),
-                                                                                                mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), mnOriginMapId(pMap->GetId())
+                                                                                                mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), mnOriginMapId(pMap->GetId()), nMarkerObs(0)
     {
         SetWorldPos(Pos);
 
@@ -659,6 +659,43 @@ namespace ORB_SLAM3
 
         mBackupObservationsId1.clear();
         mBackupObservationsId2.clear();
+    }
+
+    void MapPoint::AddMarkerObservation(KeyFrame *pKF, int idx)
+    {
+        unique_lock<mutex> lock(mMutexMarker);
+
+        // update index
+        mMarkerObservations[pKF] = idx;
+
+        nMarkerObs++;
+    }
+
+    int MapPoint::MarkerObservations()
+    {
+        unique_lock<mutex> lock(mMutexMarker);
+        return nMarkerObs;
+    }
+
+    void MapPoint::EraseMarkerObservation(KeyFrame *pKF)
+    {
+
+        unique_lock<mutex> lock(mMutexMarker);
+        if (mMarkerObservations.count(pKF))
+        {
+            tuple<int, int> indexes = mObservations[pKF];
+            int leftIndex = get<0>(indexes), rightIndex = get<1>(indexes);
+
+            nMarkerObs--;
+
+            mMarkerObservations.erase(pKF);
+        }
+    }
+
+    std::map<KeyFrame *, int> MapPoint::GetMarkerObservations()
+    {
+        unique_lock<mutex> lock(mMutexMarker);
+        return mMarkerObservations;
     }
 
 } // namespace ORB_SLAM

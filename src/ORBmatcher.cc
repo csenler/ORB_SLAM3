@@ -1348,6 +1348,32 @@ namespace ORB_SLAM3
         return nmatches;
     }
 
+    std::vector<pair<size_t, size_t>> ORBmatcher::SearchMarkerCorners(const std::vector<MARKER_NS::ArucoMarker> &vMarkersKF1, const std::vector<MARKER_NS::ArucoMarker> &vMarkersKF2) // TODO
+    {
+        uint counter1 = 0;
+        std::vector<std::pair<size_t, size_t>> vMatchedPairs;
+        // find if KeyFrame's have matching marker id's
+        for (const auto &marker1 : vMarkersKF1) // NOTE: if instead of range-loop, size-based loop is used, somehow it exceeds the size of the vector ???
+        {
+            const auto markerId = marker1.id;
+
+            if (markerId >= 0)
+            {
+                uint counter2 = 0;
+                for (const auto &marker2 : vMarkersKF2)
+                {
+                    if (marker2.id == markerId)
+                    {
+                        vMatchedPairs.push_back(std::make_pair(counter1, counter2));
+                    }
+                    counter2++;
+                }
+            }
+            counter1++;
+        }
+        return vMatchedPairs;
+    }
+
     int ORBmatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2,
                                            vector<pair<size_t, size_t>> &vMatchedPairs, const bool bOnlyStereo, const bool bCoarse)
     {

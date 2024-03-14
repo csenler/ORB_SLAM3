@@ -99,6 +99,9 @@ namespace ORB_SLAM3
                 // Triangulate new MapPoints
                 CreateNewMapPoints();
 
+                // TODO create MapPoints for marker corners (if detected)
+                CreateMapPointsForMarkerCorners();
+
                 mbAbortBA = false;
 
                 if (!CheckNewKeyFrames())
@@ -325,6 +328,12 @@ namespace ORB_SLAM3
                         pMP->UpdateNormalAndDepth();
                         pMP->ComputeDistinctiveDescriptors();
                     }
+                    // else if (pMP->mnMarkerId.load() >= 0 && mpCurrentKeyFrame->HasMarkerId(pMP->mnMarkerId.load())) // for marker corners
+                    // {
+                    //     pMP->AddObservation(mpCurrentKeyFrame, i);
+                    //     pMP->UpdateNormalAndDepth();
+                    //     pMP->ComputeDistinctiveDescriptors();
+                    // }
                     else // this can only happen for new stereo points inserted by the Tracking
                     {
                         mlpRecentAddedMapPoints.push_back(pMP);
@@ -365,6 +374,14 @@ namespace ORB_SLAM3
         {
             MapPoint *pMP = *lit;
 
+            // // do not cull marker corners (unless it is marked as Bad)
+            // if (!pMP->isBad() && !pMP->isWithoutRefKF() && pMP->mnMarkerId.load() >= 0)
+            // {
+            //     lit++;
+            //     borrar--;
+            //     continue;
+            // }
+
             if (pMP->isBad())
                 lit = mlpRecentAddedMapPoints.erase(lit);
             else if (pMP->GetFoundRatio() < 0.25f)
@@ -388,6 +405,218 @@ namespace ORB_SLAM3
             {
                 lit++;
                 borrar--;
+            }
+        }
+    }
+
+    // NOTE: assumes Monocular
+    void LocalMapping::CreateMapPointsForMarkerCorners() // create MPs for given points, such as detected marker corners
+    {
+        if (!mpCurrentKeyFrame)
+            return;
+
+        const auto currentMarkers = mpCurrentKeyFrame->GetMarkers();
+
+        if (currentMarkers.empty())
+            return;
+
+        Verbose::PrintMess("CreateMapPointsForMarkerCorners -> currentMarkers.size() = " + std::to_string(currentMarkers.size()), Verbose::VERBOSITY_NORMAL);
+
+        // Retrieve neighbor keyframes in covisibility graph
+        int nn = 30;
+
+        vector<KeyFrame *> vpNeighKFs = mpAtlas->GetAllKeyFramesWithSameMarkers(mpCurrentKeyFrame);
+
+        if (vpNeighKFs.empty())
+            return;
+
+        float th = 0.6f;
+
+        ORBmatcher matcher(th, false);
+
+        Sophus::SE3<float> sophTcw1 = mpCurrentKeyFrame->GetPose();
+        Eigen::Matrix<float, 3, 4> eigTcw1 = sophTcw1.matrix3x4();
+        Eigen::Matrix<float, 3, 3> Rcw1 = eigTcw1.block<3, 3>(0, 0);
+        Eigen::Matrix<float, 3, 3> Rwc1 = Rcw1.transpose();
+        Eigen::Vector3f tcw1 = sophTcw1.translation();
+        Eigen::Vector3f Ow1 = mpCurrentKeyFrame->GetCameraCenter();
+
+        const float &fx1 = mpCurrentKeyFrame->fx;
+        const float &fy1 = mpCurrentKeyFrame->fy;
+        const float &cx1 = mpCurrentKeyFrame->cx;
+        const float &cy1 = mpCurrentKeyFrame->cy;
+        const float &invfx1 = mpCurrentKeyFrame->invfx;
+        const float &invfy1 = mpCurrentKeyFrame->invfy;
+
+        const float ratioFactor = 1.5f * mpCurrentKeyFrame->mfScaleFactor;
+
+        // Search matches with epipolar restriction and triangulate
+        for (size_t i = 0; i < vpNeighKFs.size(); i++)
+        {
+            if (i > 0 && CheckNewKeyFrames())
+                return;
+
+            KeyFrame *pKF2 = vpNeighKFs[i];
+            const auto tempMarkers = pKF2->GetMarkers();
+
+            // skip if no markers are in KF
+            if (!pKF2 || tempMarkers.empty())
+                continue;
+
+            GeometricCamera *pCamera1 = mpCurrentKeyFrame->mpCamera, *pCamera2 = pKF2->mpCamera;
+
+            // Check first that baseline is not too short
+            Eigen::Vector3f Ow2 = pKF2->GetCameraCenter();
+            Eigen::Vector3f vBaseline = Ow2 - Ow1;
+            const float baseline = vBaseline.norm();
+
+            const float medianDepthKF2 = pKF2->ComputeSceneMedianDepth(2);
+            const float ratioBaselineDepth = baseline / medianDepthKF2;
+
+            if (ratioBaselineDepth < 0.01)
+                continue;
+
+            // Search matches that fullfil epipolar constraint
+            const auto vMatchedMarkerIndices = matcher.SearchMarkerCorners(currentMarkers, tempMarkers);
+            Verbose::PrintMess("vMatchedMarkerIndices.size() = " + std::to_string(vMatchedMarkerIndices.size()), Verbose::VERBOSITY_NORMAL);
+
+            Sophus::SE3<float> sophTcw2 = pKF2->GetPose();
+            Eigen::Matrix<float, 3, 4> eigTcw2 = sophTcw2.matrix3x4();
+            Eigen::Matrix<float, 3, 3> Rcw2 = eigTcw2.block<3, 3>(0, 0);
+            Eigen::Matrix<float, 3, 3> Rwc2 = Rcw2.transpose();
+            Eigen::Vector3f tcw2 = sophTcw2.translation();
+
+            const float &fx2 = pKF2->fx;
+            const float &fy2 = pKF2->fy;
+            const float &cx2 = pKF2->cx;
+            const float &cy2 = pKF2->cy;
+            const float &invfx2 = pKF2->invfx;
+            const float &invfy2 = pKF2->invfy;
+
+            // Triangulate each match
+            const int nmatches = vMatchedMarkerIndices.size();
+            for (int ikp = 0; ikp < nmatches; ikp++)
+            {
+                const int &idx1 = vMatchedMarkerIndices[ikp].first;
+                const int &idx2 = vMatchedMarkerIndices[ikp].second;
+
+                for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++) // for each corner point
+                {
+                    const cv::KeyPoint &kp1 = currentMarkers[idx1].undistortedCornerKeyPoints[cornerIndex];
+                    const cv::KeyPoint &kp2 = tempMarkers[idx2].undistortedCornerKeyPoints[cornerIndex];
+
+                    // Check parallax between rays
+                    Eigen::Vector3f xn1 = pCamera1->unprojectEig(kp1.pt);
+                    Eigen::Vector3f xn2 = pCamera2->unprojectEig(kp2.pt);
+
+                    Eigen::Vector3f ray1 = Rwc1 * xn1;
+                    Eigen::Vector3f ray2 = Rwc2 * xn2;
+                    const float cosParallaxRays = ray1.dot(ray2) / (ray1.norm() * ray2.norm());
+
+                    float cosParallaxStereo = cosParallaxRays + 1;
+                    float cosParallaxStereo1 = cosParallaxStereo;
+                    float cosParallaxStereo2 = cosParallaxStereo;
+
+                    cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
+
+                    Eigen::Vector3f x3D;
+
+                    bool goodProj = false;
+                    if (cosParallaxRays < cosParallaxStereo && cosParallaxRays > 0 && (cosParallaxRays < 0.9998 && !mbInertial))
+                    {
+                        goodProj = GeometricTools::Triangulate(xn1, xn2, eigTcw1, eigTcw2, x3D);
+                        if (!goodProj)
+                            continue;
+                    }
+                    else
+                    {
+                        continue; // No stereo and very low parallax
+                    }
+
+                    // Check triangulation in front of cameras
+                    float z1 = Rcw1.row(2).dot(x3D) + tcw1(2);
+                    if (z1 <= 0)
+                        continue;
+
+                    float z2 = Rcw2.row(2).dot(x3D) + tcw2(2);
+                    if (z2 <= 0)
+                        continue;
+
+                    // Check reprojection error in first keyframe
+                    const float &sigmaSquare1 = mpCurrentKeyFrame->mvLevelSigma2[kp1.octave];
+                    const float x1 = Rcw1.row(0).dot(x3D) + tcw1(0);
+                    const float y1 = Rcw1.row(1).dot(x3D) + tcw1(1);
+                    const float invz1 = 1.0 / z1;
+
+                    cv::Point2f uv1 = pCamera1->project(cv::Point3f(x1, y1, z1));
+                    float errX1 = uv1.x - kp1.pt.x;
+                    float errY1 = uv1.y - kp1.pt.y;
+
+                    if ((errX1 * errX1 + errY1 * errY1) > 5.991 * sigmaSquare1)
+                        continue;
+
+                    // Check reprojection error in second keyframe
+                    const float sigmaSquare2 = pKF2->mvLevelSigma2[kp2.octave];
+                    const float x2 = Rcw2.row(0).dot(x3D) + tcw2(0);
+                    const float y2 = Rcw2.row(1).dot(x3D) + tcw2(1);
+                    const float invz2 = 1.0 / z2;
+
+                    cv::Point2f uv2 = pCamera2->project(cv::Point3f(x2, y2, z2));
+                    float errX2 = uv2.x - kp2.pt.x;
+                    float errY2 = uv2.y - kp2.pt.y;
+                    if ((errX2 * errX2 + errY2 * errY2) > 5.991 * sigmaSquare2)
+                        continue;
+
+                    // Check scale consistency
+                    Eigen::Vector3f normal1 = x3D - Ow1;
+                    float dist1 = normal1.norm();
+
+                    Eigen::Vector3f normal2 = x3D - Ow2;
+                    float dist2 = normal2.norm();
+
+                    if (dist1 == 0 || dist2 == 0)
+                        continue;
+
+                    if (mbFarPoints && (dist1 >= mThFarPoints || dist2 >= mThFarPoints)) // MODIFICATION
+                        continue;
+
+                    const float ratioDist = dist2 / dist1;
+                    const float ratioOctave = mpCurrentKeyFrame->mvScaleFactors[kp1.octave] / pKF2->mvScaleFactors[kp2.octave];
+
+                    if (ratioDist * ratioFactor < ratioOctave || ratioDist > ratioOctave * ratioFactor)
+                        continue;
+
+                    // Triangulation is succesfull
+                    MapPoint *pMP = new MapPoint(x3D, mpCurrentKeyFrame, mpAtlas->GetCurrentMap());
+
+                    // TODO: below should be re-written with respect to marker mappoints (for later)
+                    pMP->AddMarkerObservation(mpCurrentKeyFrame, idx1);
+                    pMP->AddMarkerObservation(pKF2, idx2);
+
+                    // mpCurrentKeyFrame->AddMarkerMapPoint(pMP, idx1);
+                    // pKF2->AddMarkerMapPoint(pMP, idx2);
+
+                    pMP->AddObservation(mpCurrentKeyFrame, idx1);
+                    pMP->AddObservation(pKF2, idx2);
+
+                    mpCurrentKeyFrame->AddMapPoint(pMP, idx1);
+                    pKF2->AddMapPoint(pMP, idx2);
+
+                    pMP->ComputeDistinctiveDescriptors(); // wont be really needed for marker corners
+
+                    pMP->UpdateNormalAndDepth();
+
+                    // mark as marker corner (by saving the marker id it belongs to)
+                    pMP->mnMarkerId = currentMarkers[idx1].id;
+                    pMP->mnMarkerCornerId = cornerIndex;
+                    // // save MapPoint pointer to marker struct
+                    // mpCurrentKeyFrame->mvMarkers[idx1].vCorrespondingMapPoints[cornerIndex] = pMP;
+
+                    Verbose::PrintMess("Created MP for marker corner, id: " + std::to_string(currentMarkers[idx1].id), Verbose::VERBOSITY_NORMAL);
+
+                    mpAtlas->AddMapPoint(pMP);
+                    mlpRecentAddedMapPoints.push_back(pMP);
+                }
             }
         }
     }
@@ -923,6 +1152,9 @@ namespace ORB_SLAM3
         mpCurrentKeyFrame->UpdateBestCovisibles();
         vector<KeyFrame *> vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
 
+        // TODO: first check if KF have marker(s), if so, only cull if marker corners are visible in other N KFs
+        // -- need number of frames each marker in current keyframe is seen (for local keyframes only)
+
         float redundant_th;
         if (!mbInertial)
             redundant_th = 0.9;
@@ -955,6 +1187,7 @@ namespace ORB_SLAM3
 
             if ((pKF->mnId == pKF->GetMap()->GetInitKFid()) || pKF->isBad())
                 continue;
+
             const vector<MapPoint *> vpMapPoints = pKF->GetMapPointMatches();
 
             int nObs = 3;
@@ -1056,6 +1289,11 @@ namespace ORB_SLAM3
                         }
                     }
                 }
+                // // do not cull if have marker points
+                // else if (pKF->GetMarkersRef().size() > 0)
+                // {
+                //     continue;
+                // }
                 else
                 {
                     pKF->SetBadFlag();

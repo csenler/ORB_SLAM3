@@ -165,6 +165,8 @@ namespace ORB_SLAM3
             return mvLoadedMapIDs;
         }
 
+        std::vector<KeyFrame *> GetAllKeyFramesWithSameMarkers(KeyFrame *pKF);
+
     protected:
         std::set<Map *> mspMaps;
         std::set<Map *> mspBadMaps;

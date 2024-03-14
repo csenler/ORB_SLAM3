@@ -778,7 +778,7 @@ namespace ORB_SLAM3
     std::vector<Frame *> AuxiliaryFrameDatabase::getSampledFramesForVisualOdometry()
     {
         std::vector<Frame *> vSampledFrames; // should be N samples (hardcoded to 30 for now)
-        vSampledFrames.reserve(30);
+        vSampledFrames.reserve(iSamplingNum);
         if (lLastIvertedFileIndices.getSize() == 300)
         {
             for (const auto &weightedIndex : vExpDecaySamplingIndices)
@@ -794,7 +794,7 @@ namespace ORB_SLAM3
         {
             // return as many frames as possible (up to N frames)
             int count = 0;
-            const auto frameLimit = 30;
+            const auto frameLimit = iSamplingNum;
             for (const auto &auxFrame : lLastIvertedFileIndices)
             {
                 if (auxFrame && auxFrame->isInternalFrameValid())

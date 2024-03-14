@@ -5574,4 +5574,23 @@ namespace ORB_SLAM3
         pMap->IncreaseChangeIndex();
     }
 
+    void Optimizer::LocalBundleAdjustmentForMarkerMPs(KeyFrame *pKF, bool *pbStopFlag, Map *pMap, int &num_fixedKF, int &num_OptKF, int &num_MPs, int &num_edges) // TODO
+    {
+        const auto vMarkersInLocalKF = pKF->GetMarkers();
+
+        if (vMarkersInLocalKF.empty())
+            return;
+
+        // set current keyframe as local keyframe
+        auto localKeyFrame = pKF;
+
+        // local mappoints will be mappoints corresponding to seen marker corners
+        vector<MapPoint *> vLocalMPs;
+        vLocalMPs.reserve(vMarkersInLocalKF.size());
+        // for (const auto& marker : vMarkersInLocalKF)
+        // {
+        //     for (const auto& corner : marker->)
+        // }
+    }
+
 } // namespace ORB_SLAM

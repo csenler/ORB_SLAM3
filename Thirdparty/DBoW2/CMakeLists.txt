@@ -30,7 +30,13 @@ set(SRCS_DUTILS
 
 # set(OpenCV_DIR "/home/csenler/cpp_ws/opencv_install/lib/cmake/opencv4")
 ## check if OPENCV_CUSTOM_INSTALL_PATH environment variable is set and OpenCV found there has xfeatures2d module
-if(DEFINED ENV{OPENCV_CUSTOM_INSTALL_PATH})
+if(USE_DEFAULT_OPENCV_PATH)
+  message("USE_DEFAULT_OPENCV_PATH variable is TRUE")
+  find_package(OpenCV 4.2 EXACT REQUIRED)
+  if(NOT OpenCV_FOUND)
+    message(FATAL_ERROR "OpenCV > 4.2 not found.")
+  endif()
+elseif(DEFINED ENV{OPENCV_CUSTOM_INSTALL_PATH})
   message("OPENCV_CUSTOM_INSTALL_PATH is set")
   set(OPENCV_CUSTOM_INSTALL_PATH $ENV{OPENCV_CUSTOM_INSTALL_PATH})
   message("OPENCV_CUSTOM_INSTALL_PATH : " ${OPENCV_CUSTOM_INSTALL_PATH})

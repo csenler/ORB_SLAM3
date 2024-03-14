@@ -91,10 +91,11 @@ namespace ORB_SLAM3
         inline static unsigned long long AUX_DB_CAPACITY_TOTAL = 300;
         inline static unsigned long long ullTotalFramesInDb = 0;
         inline static int iAuxFrameID = 0;
+        inline static int iSamplingNum = 30; // default 30
         // Associated vocabulary
         inline static std::shared_ptr<ORBVocabulary> pVoc = nullptr;
 
-        inline static std::vector<int> vExpDecaySamplingIndices = AuxiliaryFrameDatabase::calculateSamplingIndices(30, AUX_DB_CAPACITY_TOTAL, 0.5);
+        inline static std::vector<int> vExpDecaySamplingIndices = AuxiliaryFrameDatabase::calculateSamplingIndices(iSamplingNum, AUX_DB_CAPACITY_TOTAL, 0.5);
 
         // Inverted file
         std::vector<std::list<AuxiliaryFrame *>> vInvertedFile;
