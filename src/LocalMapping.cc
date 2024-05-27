@@ -374,16 +374,16 @@ namespace ORB_SLAM3
         {
             MapPoint *pMP = *lit;
 
-            // // do not cull marker corners (unless it is marked as Bad)
-            // if (!pMP->isBad() && !pMP->isWithoutRefKF() && pMP->mnMarkerId.load() >= 0)
-            // {
-            //     lit++;
-            //     borrar--;
-            //     continue;
-            // }
+            const auto bIsMarkerMP = pMP->mnMarkerId.load() >= 0;
 
             if (pMP->isBad())
                 lit = mlpRecentAddedMapPoints.erase(lit);
+            // else if (bIsMarkerMP)
+            // {
+            //     // if marker MP, skip culling?
+            //     lit++;
+            //     borrar--;
+            // }
             else if (pMP->GetFoundRatio() < 0.25f)
             {
                 pMP->SetBadFlag();
@@ -1154,6 +1154,10 @@ namespace ORB_SLAM3
 
         // TODO: first check if KF have marker(s), if so, only cull if marker corners are visible in other N KFs
         // -- need number of frames each marker in current keyframe is seen (for local keyframes only)
+        // -- each marker should be seen in at least 3 frames (in the same or finer scale)
+        const std::vector<int> markerIds = mpCurrentKeyFrame->GetMarkerIds();
+        std::vector<int> vMarkerSeenCount(markerIds.size(), 0);
+        const auto thMarkerObs = 3;
 
         float redundant_th;
         if (!mbInertial)
@@ -1187,6 +1191,15 @@ namespace ORB_SLAM3
 
             if ((pKF->mnId == pKF->GetMap()->GetInitKFid()) || pKF->isBad())
                 continue;
+
+            // check marker ids
+            for (auto i = 0; i < markerIds.size(); i++)
+            {
+                if (pKF->HasMarkerId(markerIds[i]))
+                {
+                    vMarkerSeenCount[i]++;
+                }
+            }
 
             const vector<MapPoint *> vpMapPoints = pKF->GetMapPointMatches();
 
@@ -1296,7 +1309,19 @@ namespace ORB_SLAM3
                 // }
                 else
                 {
-                    pKF->SetBadFlag();
+                    bool bSkipCullingDueToMarkerCount = false;
+                    for (const auto &count : vMarkerSeenCount)
+                    {
+                        if (count < thMarkerObs)
+                        {
+                            bSkipCullingDueToMarkerCount = true;
+                            break;
+                        }
+                    }
+                    if (!bSkipCullingDueToMarkerCount)
+                    {
+                        pKF->SetBadFlag();
+                    }
                 }
             }
             if ((count > 20 && mbAbortBA) || count > 100)

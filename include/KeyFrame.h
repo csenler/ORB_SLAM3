@@ -586,6 +586,8 @@ namespace ORB_SLAM3
             std::unique_lock<std::mutex> lock(mMutexMarkers);
             mvpMarkerMapPoints[idx] = pMP;
         }
+
+        set<MapPoint *> GetMarkerMapPoints() const;
     };
 
 } // namespace ORB_SLAM

@@ -554,6 +554,10 @@ namespace ORB_SLAM3
 
         void CalculateMatchCountsForStatistics(const Frame &mCurrentFrame);
 
+        // for markers
+        std::vector<MapPoint *> GetMatchingMarkerMapPoints(const KeyFrame &refKF, const Frame &refCurrentFrame);
+        std::vector<MapPoint *> GetMatchingMarkerMapPoints(const Frame &refAuxFrame, const Frame &refCurrentFrame);
+
 #ifdef REGISTER_LOOP
         bool Stop();
 

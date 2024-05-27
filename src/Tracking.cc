@@ -2993,6 +2993,48 @@ namespace ORB_SLAM3
         }
     }
 
+    std::vector<MapPoint *> Tracking::GetMatchingMarkerMapPoints(const KeyFrame &refKF, const Frame &refCurrentFrame)
+    {
+        const auto setRefKFMPs = refKF.GetMarkerMapPoints();
+        // return those that belong to same marker id
+        std::vector<MapPoint *> vMapPoints;
+        for (auto pMP : setRefKFMPs)
+        {
+            if (pMP)
+            {
+                for (const auto &marker : refCurrentFrame.mvMarkers)
+                {
+                    if (pMP->mnMarkerId.load() == marker.id)
+                    {
+                        vMapPoints.push_back(pMP);
+                    }
+                }
+            }
+        }
+        return vMapPoints;
+    }
+
+    std::vector<MapPoint *> Tracking::GetMatchingMarkerMapPoints(const Frame &refAuxFrame, const Frame &refCurrentFrame)
+    {
+        const auto setRefKFMPs = refAuxFrame.GetMarkerMapPoints();
+        // return those that belong to same marker id
+        std::vector<MapPoint *> vMapPoints;
+        for (auto pMP : setRefKFMPs)
+        {
+            if (pMP)
+            {
+                for (const auto &marker : refCurrentFrame.mvMarkers)
+                {
+                    if (pMP->mnMarkerId.load() == marker.id)
+                    {
+                        vMapPoints.push_back(pMP);
+                    }
+                }
+            }
+        }
+        return vMapPoints;
+    }
+
     bool Tracking::TrackReferenceKeyFrame()
     {
         // increase stat counter
@@ -4718,6 +4760,20 @@ namespace ORB_SLAM3
                     int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
                     Verbose::PrintMess("nmatches (KF) : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
+                    // if marker is detected, add its corner points to the map point matches
+                    const auto vMarkerMapPointMatches = GetMatchingMarkerMapPoints(*pKF, mCurrentFrame);
+                    const int markerMatches = vMarkerMapPointMatches.size();
+                    Verbose::PrintMess("markerMatches: " + std::to_string(vMarkerMapPointMatches.size()), Verbose::VERBOSITY_NORMAL);
+
+                    // add to vvpMapPointMatches
+                    for (const auto &pMP : vMarkerMapPointMatches)
+                    {
+                        vvpMapPointMatches[i].push_back(pMP);
+                    }
+                    // update nmatches
+                    nmatches = vvpMapPointMatches.size();
+                    Verbose::PrintMess("nmatches (KF + Marker) : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
+
                     sTrackStats.vRelocStats.back().vNumOfBoWMatches[i] = nmatches;
 
                     if (nmatches < 15) // default 15
@@ -4739,6 +4795,20 @@ namespace ORB_SLAM3
                 const auto &refAuxFrame = *sampledFrames[i - nKFs];
                 int nmatches = matcher.SearchByBoW(refAuxFrame, mCurrentFrame, vvpMapPointMatches[i]);
                 Verbose::PrintMess("nmatches (AuxFrame) : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
+
+                // if marker is detected, add its corner points to the map point matches
+                const auto vMarkerMapPointMatches = GetMatchingMarkerMapPoints(refAuxFrame, mCurrentFrame);
+                const int markerMatches = vMarkerMapPointMatches.size();
+                Verbose::PrintMess("markerMatches (AuxFrame): " + std::to_string(vMarkerMapPointMatches.size()), Verbose::VERBOSITY_NORMAL);
+
+                // add to vvpMapPointMatches
+                for (const auto &pMP : vMarkerMapPointMatches)
+                {
+                    vvpMapPointMatches[i].push_back(pMP);
+                }
+                // update nmatches
+                nmatches = vvpMapPointMatches.size();
+                Verbose::PrintMess("nmatches (AuxFrame)(KF + Marker) : " + std::to_string(nmatches), Verbose::VERBOSITY_NORMAL);
 
                 sTrackStats.vRelocStats.back().vNumOfBoWMatches[i] = nmatches;
 

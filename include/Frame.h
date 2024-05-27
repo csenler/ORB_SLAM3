@@ -185,6 +185,11 @@ namespace ORB_SLAM3
             return mvpMapPoints;
         }
 
+        inline std::vector<MapPoint *> GetMarkerMapPoints() const
+        {
+            return mvpMarkerMapPoints;
+        }
+
     private:
         // Sophus/Eigen migration
         Sophus::SE3<float> mTcw;

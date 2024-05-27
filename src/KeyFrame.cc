@@ -1171,4 +1171,15 @@ namespace ORB_SLAM3
         mpKeyFrameDB = pKFDB;
     }
 
+    set<MapPoint *> KeyFrame::GetMarkerMapPoints() const
+    {
+        set<MapPoint *> s;
+        for (const auto &pMP : mvpMarkerMapPoints)
+        {
+            if (pMP && !pMP->isBad())
+                s.insert(pMP);
+        }
+        return s;
+    }
+
 } // namespace ORB_SLAM

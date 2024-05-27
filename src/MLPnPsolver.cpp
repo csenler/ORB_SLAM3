@@ -71,28 +71,35 @@ namespace ORB_SLAM3
             {
                 if (!pMP->isBad())
                 {
-                    if (i >= F.mvKeysUn.size())
-                        continue;
-                    const cv::KeyPoint &kp = F.mvKeysUn[i];
+                    if (pMP->mnMarkerId.load() >= 0)
+                    {
+                        // TODO: do for marker mappoints
+                    }
+                    else
+                    {
+                        if (i >= F.mvKeysUn.size())
+                            continue;
+                        const cv::KeyPoint &kp = F.mvKeysUn[i];
 
-                    mvP2D.push_back(kp.pt);
-                    mvSigma2.push_back(F.mvLevelSigma2[kp.octave]);
+                        mvP2D.push_back(kp.pt);
+                        mvSigma2.push_back(F.mvLevelSigma2[kp.octave]);
 
-                    // Bearing vector should be normalized
-                    cv::Point3f cv_br = mpCamera->unproject(kp.pt);
-                    cv_br /= cv_br.z;
-                    bearingVector_t br(cv_br.x, cv_br.y, cv_br.z);
-                    mvBearingVecs.push_back(br);
+                        // Bearing vector should be normalized
+                        cv::Point3f cv_br = mpCamera->unproject(kp.pt);
+                        cv_br /= cv_br.z;
+                        bearingVector_t br(cv_br.x, cv_br.y, cv_br.z);
+                        mvBearingVecs.push_back(br);
 
-                    // 3D coordinates
-                    Eigen::Matrix<float, 3, 1> posEig = pMP->GetWorldPos();
-                    point_t pos(posEig(0), posEig(1), posEig(2));
-                    mvP3Dw.push_back(pos);
+                        // 3D coordinates
+                        Eigen::Matrix<float, 3, 1> posEig = pMP->GetWorldPos();
+                        point_t pos(posEig(0), posEig(1), posEig(2));
+                        mvP3Dw.push_back(pos);
 
-                    mvKeyPointIndices.push_back(i);
-                    mvAllIndices.push_back(idx);
+                        mvKeyPointIndices.push_back(i);
+                        mvAllIndices.push_back(idx);
 
-                    idx++;
+                        idx++;
+                    }
                 }
             }
         }
@@ -130,6 +137,8 @@ namespace ORB_SLAM3
             bearingVectors_t bearingVecs(mRansacMinSet);
             points_t p3DS(mRansacMinSet);
             vector<int> indexes(mRansacMinSet);
+
+            // TODO: if marker MPs available, prioritize them, select remaining randomly
 
             // Get min set of points
             for (short i = 0; i < mRansacMinSet; ++i)
